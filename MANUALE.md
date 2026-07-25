@@ -297,6 +297,16 @@ vada tutto bene — è detto solo che non sta peggiorando. Il registro
 eventi resta l'unica fonte completa: l'audio ti gira la testa verso lo
 schermo, il log ti dice cosa guardare.
 
+C'è anche una **colonna sonora** (generata anch'essa da script,
+`tools/gen_musica.py`): una traccia per il titolo e sei tracce di gioco
+che **seguono la storia** — in campagna ogni blocco di livelli ha la sua
+(dal cantiere speranzoso dei primi livelli alla traccia ampia del finale,
+passando per la malinconia dei blocchi in cui i detriti si rivelano per
+quello che sono). In Infinita, Sfida e Livello casuale la traccia viene
+pescata a caso a inizio partita. Dal **menu di pausa** (`Esc`) regoli o
+azzeri separatamente *Musica* ed *Effetti* a passi del 25%; la scelta è
+ricordata tra una sessione e l'altra.
+
 ---
 
 ## 8. Consigli di sopravvivenza

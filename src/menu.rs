@@ -4,6 +4,7 @@
 //! menu e congela tutto, timer del tick compreso.
 
 use crate::generatore;
+use crate::impostazioni::{Impostazioni, ciclo};
 use crate::livelli::{
     ClassificaInfinita, ClassificaSfida, LIVELLI, LivelloCasuale, LivelloScelto, Modalita,
     Progressione, Record, UltimoPiazzamento, giorni_fa,
@@ -93,6 +94,10 @@ pub enum Azione {
     LivelloSuccessivo,
     ComeSiGioca,
     Riprendi,
+    /// Passo successivo del volume musica (100→75→50→25→0→100).
+    CicloMusica,
+    /// Passo successivo del volume effetti.
+    CicloEffetti,
     Ricomincia,
     TornaAlTitolo,
     /// Torna alla schermata precedente registrata in `Origine` (guida).
@@ -874,6 +879,7 @@ pub fn sincronizza_pausa(
     mut commands: Commands,
     stato: Res<State<AppState>>,
     pausa: Res<Pausa>,
+    imp: Res<Impostazioni>,
     mut sel: ResMut<Selezione>,
     q: Query<Entity, With<SchermataPausa>>,
 ) {
@@ -890,7 +896,7 @@ pub fn sincronizza_pausa(
     }
     *sel = Selezione {
         idx: 0,
-        n: 5,
+        n: 7,
         conferma: None,
     };
     commands
@@ -913,9 +919,11 @@ pub fn sincronizza_pausa(
             });
             voce(r, 0, Azione::Riprendi, "Riprendi");
             voce(r, 1, Azione::ComeSiGioca, "Come si gioca");
-            voce(r, 2, Azione::Ricomincia, "Ricomincia");
-            voce(r, 3, Azione::TornaAlTitolo, "Torna al titolo");
-            voce(r, 4, Azione::Esci, "Esci");
+            voce(r, 2, Azione::CicloMusica, format!("Musica: {}%", imp.musica));
+            voce(r, 3, Azione::CicloEffetti, format!("Effetti: {}%", imp.effetti));
+            voce(r, 4, Azione::Ricomincia, "Ricomincia");
+            voce(r, 5, Azione::TornaAlTitolo, "Torna al titolo");
+            voce(r, 6, Azione::Esci, "Esci");
         });
 }
 
@@ -1042,6 +1050,7 @@ pub fn naviga(
     mut scelto: ResMut<LivelloScelto>,
     mut casuale: ResMut<LivelloCasuale>,
     progressione: Res<Progressione>,
+    mut imp: ResMut<Impostazioni>,
     stato: Res<State<AppState>>,
     mut prossimo: ResMut<NextState<AppState>>,
     mut esci: MessageWriter<AppExit>,
@@ -1120,6 +1129,7 @@ pub fn naviga(
                 &mut scelto,
                 &mut casuale,
                 &progressione,
+                &mut imp,
                 attuale,
                 &mut prossimo,
                 &mut esci,
@@ -1139,6 +1149,7 @@ pub fn click_voci(
     mut scelto: ResMut<LivelloScelto>,
     mut casuale: ResMut<LivelloCasuale>,
     progressione: Res<Progressione>,
+    mut imp: ResMut<Impostazioni>,
     stato: Res<State<AppState>>,
     mut prossimo: ResMut<NextState<AppState>>,
     mut esci: MessageWriter<AppExit>,
@@ -1165,6 +1176,7 @@ pub fn click_voci(
                     &mut scelto,
                     &mut casuale,
                     &progressione,
+                    &mut imp,
                     attuale,
                     &mut prossimo,
                     &mut esci,
@@ -1187,6 +1199,7 @@ fn esegui(
     scelto: &mut LivelloScelto,
     casuale: &mut LivelloCasuale,
     progressione: &Progressione,
+    imp: &mut Impostazioni,
     attuale: AppState,
     prossimo: &mut NextState<AppState>,
     esci: &mut MessageWriter<AppExit>,
@@ -1262,6 +1275,14 @@ fn esegui(
         }
         Azione::IndietroTitolo => prossimo.set(AppState::Titolo),
         Azione::Riprendi => pausa.aperta = false,
+        Azione::CicloMusica => {
+            imp.musica = ciclo(imp.musica);
+            imp.salva();
+        }
+        Azione::CicloEffetti => {
+            imp.effetti = ciclo(imp.effetti);
+            imp.salva();
+        }
         Azione::Ricomincia => {
             reset.0 = true;
             pausa.aperta = false;
@@ -1282,6 +1303,22 @@ fn esegui(
 }
 
 /// Evidenzia la voce selezionata e mostra la richiesta di conferma.
+/// Tiene aggiornate le etichette dei volumi nel menu di pausa: si scrive
+/// `Voce.etichetta` (non il testo) perché `evidenzia_voci` la ricopia a
+/// ogni frame.
+pub fn aggiorna_voci_volume(imp: Res<Impostazioni>, mut voci: Query<&mut Voce>) {
+    if !imp.is_changed() {
+        return;
+    }
+    for mut v in &mut voci {
+        match v.azione {
+            Azione::CicloMusica => v.etichetta = format!("Musica: {}%", imp.musica),
+            Azione::CicloEffetti => v.etichetta = format!("Effetti: {}%", imp.effetti),
+            _ => {}
+        }
+    }
+}
+
 pub fn evidenzia_voci(
     sel: Res<Selezione>,
     mut voci: Query<(&Voce, &Children, &mut BackgroundColor, &mut BorderColor)>,

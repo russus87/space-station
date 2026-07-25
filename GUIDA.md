@@ -134,7 +134,8 @@ con il 2). Un modulo fermo mostra un simbolo che dice il perché:
 | `R` | Ripara il modulo in avaria sotto il cursore (gratis) |
 | `M` | Apre il mercato interno: 3 offerte casuali a partita, si pagano coi punti (mai soldi veri) |
 | `Spazio` | Avvia/ferma la simulazione |
-| `Esc` | Apre il menu di pausa (riprendi, ricomincia, torna al titolo) |
+| `Esc` | Apre il menu di pausa (riprendi, volumi di musica ed effetti, ricomincia, torna al titolo) |
+| `F12` | Salva uno screenshot nella cartella corrente |
 
 Per moduli sbloccabili, personaggi, storia e mercato nel dettaglio c'è il
 **MANUALE.md** — questa guida copre le basi.

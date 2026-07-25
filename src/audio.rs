@@ -7,9 +7,11 @@
 //! eventi "fisici" (costruzione, arrivi, acquisti) e le transizioni di
 //! schermata (vittoria, sblocco, sconfitta).
 
+use crate::impostazioni::Impostazioni;
 use crate::livelli::Modalita;
 use crate::personaggi::annuncio_sblocco;
 use crate::sim::{EventLog, Gravita, Sim};
+use bevy::audio::Volume;
 use bevy::prelude::*;
 
 #[derive(Resource)]
@@ -41,9 +43,19 @@ pub fn carica_suoni(mut commands: Commands, assets: Res<AssetServer>) {
     });
 }
 
-/// Riproduce un suono una volta (l'entità si smonta da sola a fine clip).
-pub fn suona(commands: &mut Commands, handle: &Handle<AudioSource>) {
-    commands.spawn((AudioPlayer::new(handle.clone()), PlaybackSettings::DESPAWN));
+/// Riproduce un suono una volta al volume dato (0..=1); l'entità si
+/// smonta da sola a fine clip. A volume zero non spawna proprio.
+pub fn suona(commands: &mut Commands, handle: &Handle<AudioSource>, volume: f32) {
+    if volume <= 0.0 {
+        return;
+    }
+    commands.spawn((
+        AudioPlayer::new(handle.clone()),
+        PlaybackSettings {
+            volume: Volume::Linear(volume),
+            ..PlaybackSettings::DESPAWN
+        },
+    ));
 }
 
 /// Sonorizza le righe nuove del log per gravità: al massimo UN suono per
@@ -52,6 +64,7 @@ pub fn suona_log(
     mut commands: Commands,
     log: Res<EventLog>,
     suoni: Res<Suoni>,
+    imp: Res<Impostazioni>,
     mut viste: Local<usize>,
 ) {
     let righe = log.ultimi(60);
@@ -72,8 +85,8 @@ pub fn suona_log(
             Gravita::Allarme => 2,
         });
     match peggiore {
-        Some(Gravita::Allarme) => suona(&mut commands, &suoni.allarme),
-        Some(Gravita::Avviso) => suona(&mut commands, &suoni.avviso),
+        Some(Gravita::Allarme) => suona(&mut commands, &suoni.allarme, imp.effetti_lineare()),
+        Some(Gravita::Avviso) => suona(&mut commands, &suoni.avviso, imp.effetti_lineare()),
         _ => {}
     }
 }
@@ -83,10 +96,11 @@ pub fn suona_arrivi(
     mut commands: Commands,
     sim: Res<Sim>,
     suoni: Res<Suoni>,
+    imp: Res<Impostazioni>,
     mut prima: Local<u32>,
 ) {
     if sim.equipaggio > *prima && sim.tick > 0 {
-        suona(&mut commands, &suoni.arrivo);
+        suona(&mut commands, &suoni.arrivo, imp.effetti_lineare());
     }
     *prima = sim.equipaggio;
 }
@@ -95,10 +109,11 @@ pub fn suona_arrivi(
 pub fn suona_click(
     mut commands: Commands,
     suoni: Res<Suoni>,
+    imp: Res<Impostazioni>,
     q: Query<&Interaction, (Changed<Interaction>, With<Button>)>,
 ) {
     if q.iter().any(|i| *i == Interaction::Pressed) {
-        suona(&mut commands, &suoni.click);
+        suona(&mut commands, &suoni.click, imp.effetti_lineare());
     }
 }
 
@@ -108,15 +123,16 @@ pub fn suona_completato(
     mut commands: Commands,
     suoni: Res<Suoni>,
     modalita: Res<Modalita>,
+    imp: Res<Impostazioni>,
 ) {
     let sblocco = matches!(*modalita, Modalita::Campagna(i) if annuncio_sblocco(i + 1).is_some());
     if sblocco {
-        suona(&mut commands, &suoni.sblocco);
+        suona(&mut commands, &suoni.sblocco, imp.effetti_lineare());
     } else {
-        suona(&mut commands, &suoni.vittoria);
+        suona(&mut commands, &suoni.vittoria, imp.effetti_lineare());
     }
 }
 
-pub fn suona_sconfitta(mut commands: Commands, suoni: Res<Suoni>) {
-    suona(&mut commands, &suoni.sconfitta);
+pub fn suona_sconfitta(mut commands: Commands, suoni: Res<Suoni>, imp: Res<Impostazioni>) {
+    suona(&mut commands, &suoni.sconfitta, imp.effetti_lineare());
 }

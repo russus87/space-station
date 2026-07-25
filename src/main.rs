@@ -6,9 +6,11 @@
 
 mod audio;
 mod generatore;
+mod impostazioni;
 mod livelli;
 mod menu;
 mod mercato;
+mod musica;
 mod personaggi;
 mod modules;
 mod sim;
@@ -224,6 +226,8 @@ fn main() {
         .init_resource::<livelli::LivelloScelto>()
         .init_resource::<livelli::LivelloCasuale>()
         .init_resource::<mercato::Mercato>()
+        .init_resource::<musica::StatoMusica>()
+        .insert_resource(impostazioni::carica())
         .init_resource::<livelli::UltimoPiazzamento>()
         // classifiche e progressione si leggono dal disco una volta
         // all'avvio; file assenti o rotti equivalgono a "nessun dato", senza
@@ -300,6 +304,9 @@ fn main() {
                 audio::suona_log,
                 audio::suona_arrivi,
                 audio::suona_click,
+                musica::gestisci_musica,
+                musica::applica_volume,
+                menu::aggiorna_voci_volume,
                 screenshot_tasto,
                 demo_foto,
                 visibilita_scena,
@@ -617,6 +624,7 @@ fn input_mouse(
     griglia: Res<Griglia>,
     art: Res<Art>,
     suoni: Res<audio::Suoni>,
+    imp: Res<impostazioni::Impostazioni>,
     pausa: Res<Pausa>,
     mut station: ResMut<Station>,
     sel: Res<Selected>,
@@ -672,7 +680,7 @@ fn input_mouse(
         }
         let etichetta = costruisci_modulo(&mut commands, &mut station, &art, &griglia, kind, cella);
         log.info(sim.tick, format!("Costruito: {}", etichetta));
-        audio::suona(&mut commands, &suoni.costruzione);
+        audio::suona(&mut commands, &suoni.costruzione, imp.effetti_lineare());
     }
 
     if destro && let Some(e) = station.celle.remove(&cella) {
@@ -680,7 +688,7 @@ fn input_mouse(
             log.info(sim.tick, format!("Rimosso: {}", m.etichetta));
         }
         commands.entity(e).despawn();
-        audio::suona(&mut commands, &suoni.rimozione);
+        audio::suona(&mut commands, &suoni.rimozione, imp.effetti_lineare());
     }
 }
 
@@ -1068,6 +1076,7 @@ fn applica_reset(
     mut sel: ResMut<Selected>,
     mut stato_livello: ResMut<livelli::StatoLivello>,
     mut offerte: ResMut<mercato::Mercato>,
+    mut stato_musica: ResMut<musica::StatoMusica>,
     modalita: Res<Modalita>,
     casuale: Res<livelli::LivelloCasuale>,
     griglia: Res<Griglia>,
@@ -1090,6 +1099,7 @@ fn applica_reset(
     };
     *stato_livello = livelli::StatoLivello::default();
     sel.0 = ModuleKind::Reattore;
+    stato_musica.pesca_casuale();
     log.svuota();
     // campagna e casuale condividono tutto: livello con obiettivo, detriti
     // e budget; cambia solo da dove arriva la definizione

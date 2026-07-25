@@ -494,7 +494,7 @@ pub fn salva_progressione(completati: usize) {
 // ---------------- percorsi e tempo ----------------
 
 /// `$XDG_DATA_HOME/space-station`, ripiego `$HOME/.local/share/space-station`.
-fn cartella_dati() -> Option<PathBuf> {
+pub(crate) fn cartella_dati() -> Option<PathBuf> {
     let base = std::env::var_os("XDG_DATA_HOME")
         .filter(|v| !v.is_empty())
         .map(PathBuf::from)
