@@ -665,7 +665,6 @@ fn input_mouse(
 
     if sinistro && !station.celle.contains_key(&cella) && !station.ostacoli.contains(&cella) {
         let kind = sel.0;
-        let def = kind.def();
         // il Centro comando coordina gli arrivi di tutta la stazione:
         // il secondo non avrebbe niente da coordinare
         if kind == ModuleKind::CentroComando
