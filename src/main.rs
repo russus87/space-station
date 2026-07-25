@@ -4,6 +4,7 @@
 //! cablaggio degli stati dell'app. La UI di gioco sta in `ui.rs`, le
 //! schermate di menu in `menu.rs`.
 
+mod generatore;
 mod livelli;
 mod menu;
 mod modules;
@@ -21,8 +22,8 @@ use sim::{EventLog, Fermo, Module, Sim, TICK_MASSIMO};
 
 const WIN_W: f32 = 1160.0;
 const WIN_H: f32 = 800.0;
-const GRID_W: i32 = 14;
-const GRID_H: i32 = 8;
+pub(crate) const GRID_W: i32 = 14;
+pub(crate) const GRID_H: i32 = 8;
 const ART: f32 = 32.0; // dimensione nativa dell'art di una cella
 
 /// Handle degli sprite: caricati una volta, riusati da griglia, palette,
@@ -215,6 +216,7 @@ fn main() {
         .init_resource::<Modalita>()
         .init_resource::<livelli::StatoLivello>()
         .init_resource::<livelli::LivelloScelto>()
+        .init_resource::<livelli::LivelloCasuale>()
         .init_resource::<livelli::UltimoPiazzamento>()
         // classifiche e progressione si leggono dal disco una volta
         // all'avvio; file assenti o rotti equivalgono a "nessun dato", senza
@@ -262,8 +264,8 @@ fn main() {
                 ui::click_palette,
                 ui::click_bottone_menu,
                 sim::sim_tick.run_if(sim_attiva),
-                // in Infinita il codice degli obiettivi non gira proprio
-                livelli::controlla_obiettivo.run_if(livelli::campagna_attiva),
+                // in Infinita/Sfida il codice degli obiettivi non gira proprio
+                livelli::controlla_obiettivo.run_if(livelli::obiettivi_attivi),
                 controlla_fine,
             )
                 .chain()
@@ -845,7 +847,7 @@ fn controlla_fine(
                 piazzamento.0 = classifica_sfida.registra(&sim);
                 classifica_sfida.salva();
             }
-            Modalita::Campagna(_) => {}
+            Modalita::Campagna(_) | Modalita::Casuale => {}
         }
         prossimo.set(AppState::FinePartita);
     }
@@ -864,6 +866,7 @@ fn applica_reset(
     mut sel: ResMut<Selected>,
     mut stato_livello: ResMut<livelli::StatoLivello>,
     modalita: Res<Modalita>,
+    casuale: Res<livelli::LivelloCasuale>,
     griglia: Res<Griglia>,
     art: Res<Art>,
     moduli: Query<Entity, With<Module>>,
@@ -880,51 +883,56 @@ fn applica_reset(
     *sim = Sim::default();
     sim.tetto_tick = match *modalita {
         Modalita::Infinita => None,
-        Modalita::Sfida | Modalita::Campagna(_) => Some(TICK_MASSIMO),
+        Modalita::Sfida | Modalita::Campagna(_) | Modalita::Casuale => Some(TICK_MASSIMO),
     };
-    if let Modalita::Campagna(i) = *modalita {
-        station.max_moduli = Some(LIVELLI[i].max_moduli);
-    }
     *stato_livello = livelli::StatoLivello::default();
     sel.0 = ModuleKind::Reattore;
     log.svuota();
-    match *modalita {
-        Modalita::Campagna(i) => {
-            log.info(
-                0,
-                format!(
-                    "Livello {} — {}: {}",
-                    i + 1,
-                    LIVELLI[i].nome,
-                    LIVELLI[i].obiettivo.descrizione()
-                ),
-            );
-            for &(x, y) in LIVELLI[i].ostacoli {
-                let cella = IVec2::new(x, y);
-                station.ostacoli.insert(cella);
-                let p = griglia.cella_in_mondo(cella);
-                commands.spawn((
-                    Sprite {
-                        image: art.ostacolo.clone(),
-                        custom_size: Some(Vec2::splat(griglia.cella)),
-                        ..default()
-                    },
-                    Transform::from_xyz(p.x, p.y, 1.0),
-                    Ostacolo { cella },
-                    Scena,
-                ));
-            }
-            if !LIVELLI[i].ostacoli.is_empty() {
-                log.info(0, "Detriti sulla griglia: costruisci intorno");
-            }
-            log.info(0, format!("Moduli disponibili: {}", LIVELLI[i].max_moduli));
-            log.info(0, "Costruisci e premi Spazio");
-        }
-        Modalita::Infinita => log.info(0, "Nuova stazione: costruisci e premi Spazio"),
-        Modalita::Sfida => log.info(
+    // campagna e casuale condividono tutto: livello con obiettivo, detriti
+    // e budget; cambia solo da dove arriva la definizione
+    let livello = match *modalita {
+        Modalita::Campagna(i) => Some(&LIVELLI[i]),
+        Modalita::Casuale => casuale.0.as_ref(),
+        Modalita::Infinita | Modalita::Sfida => None,
+    };
+    if let Some(livello) = livello {
+        station.max_moduli = Some(livello.max_moduli);
+        let intestazione = match *modalita {
+            Modalita::Campagna(i) => format!("Livello {} — {}", i + 1, livello.nome),
+            _ => format!("Livello casuale — {}", livello.nome),
+        };
+        log.info(
             0,
-            format!("Nuova stazione (Sfida, {TICK_MASSIMO} tick): costruisci e premi Spazio"),
-        ),
+            format!("{}: {}", intestazione, livello.obiettivo.descrizione()),
+        );
+        for &(x, y) in &livello.ostacoli {
+            let cella = IVec2::new(x, y);
+            station.ostacoli.insert(cella);
+            let p = griglia.cella_in_mondo(cella);
+            commands.spawn((
+                Sprite {
+                    image: art.ostacolo.clone(),
+                    custom_size: Some(Vec2::splat(griglia.cella)),
+                    ..default()
+                },
+                Transform::from_xyz(p.x, p.y, 1.0),
+                Ostacolo { cella },
+                Scena,
+            ));
+        }
+        if !livello.ostacoli.is_empty() {
+            log.info(0, "Detriti sulla griglia: costruisci intorno");
+        }
+        log.info(0, format!("Moduli disponibili: {}", livello.max_moduli));
+        log.info(0, "Costruisci e premi Spazio");
+    } else {
+        match *modalita {
+            Modalita::Sfida => log.info(
+                0,
+                format!("Nuova stazione (Sfida, {TICK_MASSIMO} tick): costruisci e premi Spazio"),
+            ),
+            _ => log.info(0, "Nuova stazione: costruisci e premi Spazio"),
+        }
     }
 }
 
@@ -959,7 +967,7 @@ mod test {
     fn ostacoli_dei_livelli_dentro_la_griglia_e_senza_doppioni() {
         for (n, livello) in LIVELLI.iter().enumerate() {
             let mut viste = HashSet::new();
-            for &(x, y) in livello.ostacoli {
+            for &(x, y) in &livello.ostacoli {
                 assert!(
                     (0..GRID_W).contains(&x) && (0..GRID_H).contains(&y),
                     "livello {}: ostacolo fuori griglia ({x},{y})",

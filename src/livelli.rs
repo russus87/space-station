@@ -12,11 +12,13 @@
 //! Formato volutamente a prova di mano umana: una riga malformata si salta,
 //! un file assente o illeggibile equivale a "nessun dato", senza errori.
 
+use crate::generatore;
 use crate::menu::AppState;
 use crate::modules::ModuleKind;
 use crate::sim::{EventLog, Module, Sim};
 use bevy::prelude::*;
 use std::path::PathBuf;
+use std::sync::LazyLock;
 use std::time::{SystemTime, UNIX_EPOCH};
 
 /// Quante partite tiene la classifica.
@@ -39,11 +41,19 @@ pub enum Modalita {
     Sfida,
     /// Indice 0-based nel vettore `LIVELLI`.
     Campagna(usize),
+    /// Un livello generato con seed casuale (`LivelloCasuale`): obiettivo
+    /// attivo come in campagna, ma fuori da progressione e classifiche.
+    Casuale,
 }
 
-/// Run condition: gli obiettivi esistono solo in campagna.
-pub fn campagna_attiva(modalita: Res<Modalita>) -> bool {
-    matches!(*modalita, Modalita::Campagna(_))
+/// Il livello della modalità casuale in corso. `None` fuori da `Casuale`;
+/// resta valorizzato durante la partita così "Riprova" rigioca lo stesso.
+#[derive(Resource, Default)]
+pub struct LivelloCasuale(pub Option<LivelloDef>);
+
+/// Run condition: gli obiettivi esistono in campagna e nel livello casuale.
+pub fn obiettivi_attivi(modalita: Res<Modalita>) -> bool {
+    matches!(*modalita, Modalita::Campagna(_) | Modalita::Casuale)
 }
 
 /// Livello selezionato nelle schermate di campagna (selezione → briefing).
@@ -96,90 +106,101 @@ pub enum Obiettivo {
     Colonia { equipaggio: u32, tick: u64 },
 }
 
+#[derive(Clone)]
 pub struct LivelloDef {
-    pub nome: &'static str,
+    pub nome: String,
     /// Una riga, mostrata prima di iniziare il livello.
-    pub briefing: &'static str,
+    pub briefing: String,
     pub obiettivo: Obiettivo,
     /// Celle occupate da detriti: non ci si costruisce, non si rimuovono.
     /// Coordinate 0-based della griglia 14×8, origine in basso a sinistra.
     /// La simulazione non li vede: sono solo un vincolo di piazzamento.
-    pub ostacoli: &'static [(i32, i32)],
+    pub ostacoli: Vec<(i32, i32)>,
     /// Quanti moduli si possono costruire in questo livello (i corridoi
     /// contano). Tarato sull'obiettivo: fabbisogno minimo della soluzione
     /// più ovvia + margine per corridoi ed errori, così il livello chiede
     /// efficienza senza diventare un incastro unico obbligato. Solo
-    /// campagna: Infinita e Sfida restano senza limite.
+    /// campagna e casuale: Infinita e Sfida restano senza limite.
     pub max_moduli: u32,
 }
 
-/// I sei livelli, in ordine didattico: ognuno insegna un meccanismo.
-/// I detriti entrano dal livello 2 (dove nasce il problema del "portare
-/// energia lontano") e crescono con la campagna; i livelli d'esordio di un
-/// meccanismo nuovo (1, 3, 5) restano a griglia libera per non sommare
-/// due difficoltà.
-pub const LIVELLI: [LivelloDef; 6] = [
-    LivelloDef {
-        nome: "Primo respiro",
-        briefing: "Un reattore, un life support, un dormitorio: attaccati tra loro.",
-        obiettivo: Obiettivo::Equipaggio { minimo: 4 },
-        ostacoli: &[],
-        // fabbisogno minimo 4 (reattore, life support, dormitorio, radiatore)
-        max_moduli: 6,
-    },
-    LivelloDef {
-        nome: "La rete",
-        briefing: "Un solo reattore non basta più: allunga con i corridoi o costruisci una seconda rete.",
-        obiettivo: Obiettivo::Equipaggio { minimo: 8 },
-        // muro verticale al centro, aggirabile in alto e in basso
-        ostacoli: &[(6, 2), (6, 3), (6, 4), (6, 5)],
-        // fabbisogno minimo 7, più i corridoi per aggirare il muro
-        max_moduli: 12,
-    },
-    LivelloDef {
-        nome: "Sala macchine",
-        briefing: "I laboratori non vogliono corrente: vogliono gente.",
-        obiettivo: Obiettivo::LabConsecutivi {
-            laboratori: 2,
-            tick: 15,
+/// I 50 livelli della campagna: i primi 6 curati a mano (ordine didattico,
+/// ognuno insegna un meccanismo; i detriti entrano dal livello 2 e i
+/// livelli d'esordio di un meccanismo nuovo restano a griglia libera), dal
+/// 7 al 50 generati da `generatore::genera_campagna` con seed fisso per
+/// indice: il livello 23 è identico per tutti e a ogni avvio.
+pub static LIVELLI: LazyLock<Vec<LivelloDef>> = LazyLock::new(|| {
+    let mut livelli = livelli_curati();
+    for n in 7..=50 {
+        livelli.push(generatore::genera_campagna(n));
+    }
+    livelli
+});
+
+fn livelli_curati() -> Vec<LivelloDef> {
+    vec![
+        LivelloDef {
+            nome: "Primo respiro".into(),
+            briefing: "Un reattore, un life support, un dormitorio: attaccati tra loro.".into(),
+            obiettivo: Obiettivo::Equipaggio { minimo: 4 },
+            ostacoli: vec![],
+            // fabbisogno minimo 4 (reattore, life support, dormitorio, radiatore)
+            max_moduli: 6,
         },
-        ostacoli: &[],
-        // fabbisogno minimo 9 (2 reattori, life support, dormitorio, 2 lab, 3 radiatori)
-        max_moduli: 13,
-    },
-    LivelloDef {
-        nome: "Termica",
-        briefing: "Tutto quello che lavora scalda.",
-        obiettivo: Obiettivo::SopravviviConLab {
-            laboratori: 2,
-            tick: 60,
+        LivelloDef {
+            nome: "La rete".into(),
+            briefing: "Un solo reattore non basta più: allunga con i corridoi o costruisci una seconda rete.".into(),
+            obiettivo: Obiettivo::Equipaggio { minimo: 8 },
+            // muro verticale al centro, aggirabile in alto e in basso
+            ostacoli: vec![(6, 2), (6, 3), (6, 4), (6, 5)],
+            // fabbisogno minimo 7, più i corridoi per aggirare il muro
+            max_moduli: 12,
         },
-        // detriti sparsi: spezzano i blocchi compatti, i radiatori vanno incastrati
-        ostacoli: &[(2, 5), (4, 1), (7, 4), (10, 6), (11, 2)],
-        // come Sala macchine, con un radiatore di margine per le avarie
-        max_moduli: 14,
-    },
-    LivelloDef {
-        nome: "Autonomia",
-        briefing: "Il margine serve a questo: a non restare mai al buio.",
-        obiettivo: Obiettivo::PuntiSenzaBlackout { punti: 400 },
-        ostacoli: &[],
-        // stazione libera, ma il margine energetico va costruito con poco
-        max_moduli: 15,
-    },
-    LivelloDef {
-        nome: "Colonia",
-        briefing: "Adesso tienila in piedi davvero.",
-        obiettivo: Obiettivo::Colonia {
-            equipaggio: 12,
-            tick: 100,
+        LivelloDef {
+            nome: "Sala macchine".into(),
+            briefing: "I laboratori non vogliono corrente: vogliono gente.".into(),
+            obiettivo: Obiettivo::LabConsecutivi {
+                laboratori: 2,
+                tick: 15,
+            },
+            ostacoli: vec![],
+            // fabbisogno minimo 9 (2 reattori, life support, dormitorio, 2 lab, 3 radiatori)
+            max_moduli: 13,
         },
-        // fascia diagonale: la stazione grande va fatta serpeggiare
-        ostacoli: &[(4, 6), (5, 5), (6, 4), (7, 3), (8, 2), (9, 1)],
-        // fabbisogno minimo 11, più i corridoi per serpeggiare tra i detriti
-        max_moduli: 18,
-    },
-];
+        LivelloDef {
+            nome: "Termica".into(),
+            briefing: "Tutto quello che lavora scalda.".into(),
+            obiettivo: Obiettivo::SopravviviConLab {
+                laboratori: 2,
+                tick: 60,
+            },
+            // detriti sparsi: spezzano i blocchi compatti, i radiatori vanno incastrati
+            ostacoli: vec![(2, 5), (4, 1), (7, 4), (10, 6), (11, 2)],
+            // come Sala macchine, con un radiatore di margine per le avarie
+            max_moduli: 14,
+        },
+        LivelloDef {
+            nome: "Autonomia".into(),
+            briefing: "Il margine serve a questo: a non restare mai al buio.".into(),
+            obiettivo: Obiettivo::PuntiSenzaBlackout { punti: 400 },
+            ostacoli: vec![],
+            // stazione libera, ma il margine energetico va costruito con poco
+            max_moduli: 15,
+        },
+        LivelloDef {
+            nome: "Colonia".into(),
+            briefing: "Adesso tienila in piedi davvero.".into(),
+            obiettivo: Obiettivo::Colonia {
+                equipaggio: 12,
+                tick: 100,
+            },
+            // fascia diagonale: la stazione grande va fatta serpeggiare
+            ostacoli: vec![(4, 6), (5, 5), (6, 4), (7, 3), (8, 2), (9, 1)],
+            // fabbisogno minimo 11, più i corridoi per serpeggiare tra i detriti
+            max_moduli: 18,
+        },
+    ]
+}
 
 impl Obiettivo {
     /// L'obiettivo scritto per esteso (briefing, schermate).
@@ -275,9 +296,10 @@ impl Obiettivo {
 }
 
 /// Valuta l'obiettivo del livello in corso, una volta per tick effettivo.
-/// Gira solo in campagna (`campagna_attiva`) e solo in `InGioco`.
+/// Gira solo con un obiettivo attivo (`obiettivi_attivi`) e in `InGioco`.
 pub fn controlla_obiettivo(
     modalita: Res<Modalita>,
+    casuale: Res<LivelloCasuale>,
     sim: Res<Sim>,
     mut stato: ResMut<StatoLivello>,
     mut progressione: ResMut<Progressione>,
@@ -285,8 +307,13 @@ pub fn controlla_obiettivo(
     mut log: ResMut<EventLog>,
     mut prossimo: ResMut<NextState<AppState>>,
 ) {
-    let Modalita::Campagna(i) = *modalita else {
-        return;
+    let obiettivo = match *modalita {
+        Modalita::Campagna(i) => LIVELLI[i].obiettivo,
+        Modalita::Casuale => match &casuale.0 {
+            Some(l) => l.obiettivo,
+            None => return,
+        },
+        Modalita::Infinita | Modalita::Sfida => return,
     };
     // conteggio vivo per l'HUD, anche in pausa-costruzione (anteprima)
     stato.lab_attivi = moduli
@@ -298,13 +325,16 @@ pub fn controlla_obiettivo(
         return;
     }
     stato.ultimo_tick = sim.tick;
-    if LIVELLI[i].obiettivo.avanza(&mut stato, &sim) {
+    if obiettivo.avanza(&mut stato, &sim) {
         stato.completato = true;
         log.info(
             sim.tick,
-            format!("Obiettivo raggiunto: {}", LIVELLI[i].obiettivo.descrizione()),
+            format!("Obiettivo raggiunto: {}", obiettivo.descrizione()),
         );
-        if i + 1 > progressione.completati {
+        // la progressione avanza solo in campagna: il casuale è fuori gara
+        if let Modalita::Campagna(i) = *modalita
+            && i + 1 > progressione.completati
+        {
             progressione.completati = i + 1;
             salva_progressione(progressione.completati);
         }

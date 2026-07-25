@@ -1,60 +1,53 @@
-# Stato sessione — 25 luglio 2026, sera
+# Stato sessione — 25 luglio 2026, sera tardi
 
 ## Attività in corso
-Nessuna: si attende che l'utente legga `SPEC-CAMPAGNA.md` e approvi/modifichi
-le sezioni ⚠ (sblocco moduli, personaggi bonus, punti laboratorio).
+Nessuna: si attende ancora che l'utente legga `SPEC-CAMPAGNA.md` e
+approvi/modifichi le sezioni ⚠ (sblocco moduli, personaggi bonus, punti
+laboratorio) — invariato dallo snapshot precedente.
 
 ## Appena completato
-- **Playtest utente sul livello 6 "Colonia"**: confermata fattibilità con 18
-  moduli (minimo 11, spiegato all'utente); emerso che il laboratorio, fuori
-  dai livelli 3-4, non serve a nulla — difetto di design riconosciuto.
-  Proposta di correzione (+5 punti/tick per laboratorio attivo) non ancora
-  implementata, ora tracciata in `SPEC-CAMPAGNA.md` sez. 5.
-- **Tasto "MENU esc" nell'HUD**, sempre visibile in alto a destra, perché
-  l'utente non trovava come uscire dalla partita (il menu era raggiungibile
-  solo con Esc, non scopribile). Apre l'overlay di pausa già esistente.
-  `src/ui.rs`: componente `BottoneMenu` (riga 40) + sistema
-  `click_bottone_menu` (riga 608); registrato in `src/main.rs` (riga 263).
-  Durante l'edit un inserimento aveva spezzato il `#[derive]` di `CampoHud`
-  (struct finita tra derive ed enum); corretto subito — promemoria per stare
-  attenti agli edit vicino ad attributi.
-- **Sessione di design campagna lunga** con l'utente (~50 livelli lineari,
-  sblocchi ogni 5 livelli, eventuale modalità "livello random" e
-  intermezzi/storia). Con AskUserQuestion ha scelto: approccio IBRIDO
-  (generatore parametrico a seed fisso + livelli curati ai punti chiave),
-  sblocchi SIA moduli SIA personaggi alternati, e DESIGN DOC prima del
-  codice.
-- **`SPEC-CAMPAGNA.md`** scritto (nuovo file, ~180 righe, marcato "PROPOSTA
-  in attesa di approvazione"; rimando aggiunto in testa a `SPEC.md`).
-  Contenuto: 10 blocchi da 5 livelli con tema e sblocco a fine blocco;
-  generatore parametrico (obiettivo/detriti/budget scalati, seed
-  deterministico per livello, risolvibilità garantita via fabbisogno_minimo
-  condiviso + flood fill); griglia selezione 10×5; livello casuale con 3
-  difficoltà; 5 moduli nuovi con numeri esatti (Batteria liv.5, Serra
-  liv.15, Gru liv.25, Condotto termico liv.35, Centro comando liv.45); 5
-  personaggi, uno schierabile per partita (Ingegnere liv.10, Medico liv.20,
-  Caposquadra liv.30, Scienziata liv.40, Comandante liv.50); regola base +5
-  punti/tick per laboratorio attivo; intermezzi diario di bordo ogni 10
-  livelli; persistenza invariata (sblocchi derivati da progressione.txt);
-  piano in 5 fasi con gate di approvazione ⚠; rischi dichiarati (Batteria
-  tocca l'allocazione energia = zona delicata, bilanciamento a tavolino, 50
-  livelli non è sacro — tagliare a 30 se il ritmo crolla).
-- **Aggiunta sez. 9** a `SPEC-CAMPAGNA.md` (i vecchi Rischi diventano sez.
-  10), in risposta alla domanda dell'utente "si può migliorare ancora?":
-  "Oltre la campagna: profondità, non solo ampiezza", autocritica che il
-  piano moltiplica contenuto ma non decisioni durante la partita. Sei
-  estensioni con priorità/costo: 9.1 eventi con scelta (⚠, da osservatore a
-  comandante), 9.2 riparazione moduli con equipaggio impegnato (⚠), 9.3
-  velocità 1×/2×/4×, 9.4 stelle per livello (1-3, `stelle.txt`), 9.5 audio
-  generato via script Python, 9.6 sfida del giorno (seed dalla data). Più
-  lista esplicita di cosa NON aggiungere (valute, online, altre modalità).
-  Collocazione: 9.3/9.4 in fase 2, 9.1/9.2 come fase 6 a sé, 9.5/9.6
-  indipendenti. Nessun codice toccato.
+- **Correzione di un errore precedente in `SPEC-CAMPAGNA.md`**: il tasto `R`
+  per riparare i moduli in avaria ESISTE già (gratuito e istantaneo,
+  `src/main.rs` righe 473-479, verificato). La sez. 9.2 non propone più di
+  "creare" la riparazione ma di "darle un costo" (impegnare 2 di equipaggio
+  per 10 tick, sinergia col personaggio Ingegnere).
+- **Progetto pubblicato su GitHub, pubblico**: repository
+  https://github.com/russus87/space-station (richiesta utente: "come per gli
+  altri repo"). `git init` su `main`, `.gitignore` (target/, __pycache__,
+  pkgstage), `LICENSE` MIT (stesso testo/holder degli altri repo russus87),
+  `README.md` aggiornato (tre modalità, sezione Download); commit iniziale +
+  2 commit di fix CI; tag `v0.1.0`.
+- **CI** (`.github/workflows/build.yml`, sul modello di
+  russus87/setaccio, trigger tag `v*` + `workflow_dispatch`, release
+  automatica sui tag), adattato da Tauri a Bevy puro. Tre job:
+  - `arch`: container archlinux, `makepkg` → `.pkg.tar.zst` (binario+assets
+    in `/usr/lib/space-station`, symlink `/usr/bin`, `.desktop` e icone
+    hicolor);
+  - `linux`: ubuntu-22.04 → `tar.gz` (binario+assets+guide);
+  - `windows`: zip (exe+assets).
+  Nuovi file: `packaging/PKGBUILD` (source locali con assets.tar, `pkgver`
+  riscritto dalla CI), `packaging/space-station.desktop`,
+  `tools/gen_icon.py` (icone 128/256/512 scalate nearest-neighbour dallo
+  sprite del reattore, riusa `encode_png` di `gen_sprites.py`).
+- **Due fix CI** dopo il primo run:
+  1. dipendenze Wayland mancanti (winit compila `wayland-sys` anche per
+     runtime X11): aggiunti `wayland`+`libxkbcommon` (Arch) e
+     `libwayland-dev`+`libxkbcommon-dev` (Ubuntu);
+  2. `makepkg` verifica le `depends=` del PKGBUILD: aggiunti
+     `vulkan-icd-loader` e `hicolor-icon-theme` al container.
+  Tag `v0.1.0` forzato due volte sui fix.
+- **Release v0.1.0 verificata** (via `gh release view`, non solo riferita):
+  pubblica, non draft, non prerelease, con tutti e tre gli artefatti
+  presenti — `space-station-0.1.0-1-x86_64.pkg.tar.zst` (~31 MB),
+  `space-station-0.1.0-linux-x86_64.tar.gz` (~37 MB),
+  `space-station-0.1.0-windows-x86_64.zip` (~25 MB). Run CI verde su tutti
+  e tre i job.
 
 ## Prossimo passo immediato
 Attendere che l'utente legga `SPEC-CAMPAGNA.md` e approvi/modifichi le
-sezioni ⚠ 3 (moduli), 4 (personaggi), 5 (punti laboratorio). Se approvato,
-la fase 1 del piano (sez. 8) è "punti laboratorio": piccola e immediata.
+sezioni ⚠ 3 (moduli), 4 (personaggi), 5 (punti laboratorio), 9.1 e 9.2. Se
+approvato, la fase 1 del piano (sez. 8) è "punti laboratorio": piccola e
+immediata.
 
 ## Passi successivi
 1. Punti laboratorio (+5/tick per lab attivo) — se approvata la sez. 5.
@@ -63,39 +56,43 @@ la fase 1 del piano (sez. 8) è "punti laboratorio": piccola e immediata.
 4. Personaggi bonus, uno schierabile per partita.
 5. Intermezzi diario di bordo ogni 10 livelli.
 6. Residui da sessioni precedenti, ancora validi: bilanciamento budget
-   `max_moduli` dei livelli attuali (tarati a tavolino, ora confermati
-   giocabili da playtest su L6); debolezza equipaggio/posti-letto
-   (equipaggio in eccesso dopo blackout dormitori non muore né emigra);
-   calore con accumulo invece del contatore binario `calore_netto > 0`.
+   `max_moduli` dei livelli attuali (tarati a tavolino, confermati giocabili
+   da playtest su L6); debolezza equipaggio/posti-letto (equipaggio in
+   eccesso dopo blackout dormitori non muore né emigra); calore con
+   accumulo invece del contatore binario `calore_netto > 0`.
 
 ## Stato di verifica
 - Verificato io stesso, ora: `cargo build --quiet` — 0 errori, 0 warning;
   `cargo test --quiet` — 14/14 passati.
-- Verificato io stesso, ora, nel codice: `BottoneMenu` in `src/ui.rs` (righe
-  40 e 262), `click_bottone_menu` in `src/ui.rs` (riga 608) registrato in
-  `src/main.rs` (riga 263); `#[derive(Component, Clone, Copy)]` di
-  `CampoHud` correttamente seguito dall'enum (righe 42-43), nessuna struct
-  frapposta — la correzione riferita è confermata sul filesystem.
-- Verificato io stesso, ora: `SPEC-CAMPAGNA.md` esiste, riga 3 marcata
-  "STATO: PROPOSTA, in attesa di approvazione", sezioni 1-10 presenti con
-  gli header attesi (righe 15-209: generatore, sblocchi moduli/personaggi,
-  punti lab, intermezzi, piano, sez. 9 "Oltre la campagna" con le sei
-  estensioni 9.1-9.6, sez. 10 Rischi); `SPEC.md` riga 16 contiene il
-  rimando a `SPEC-CAMPAGNA.md`.
-- Riferito (non verificato da me in questa sessione): il playtest
-  dell'utente sul livello 6 e i suoi commenti sul laboratorio; il contenuto
-  esatto delle scelte fatte con AskUserQuestion durante la sessione di
-  design.
-- Non provato: nessuna implementazione di codice della campagna lunga, del
-  generatore, dei nuovi moduli/personaggi o degli intermezzi — esiste solo
-  il design doc, non ancora approvato.
+- Verificato io stesso, ora, nel codice: `src/main.rs` righe 473-479, il
+  blocco `if tasti.just_pressed(KeyCode::KeyR) ... m.broken = false` esiste
+  ed è gratuito/istantaneo — conferma la correzione riportata alla sez. 9.2.
+- Verificato io stesso, ora: `SPEC-CAMPAGNA.md` riga 194, sez. 9.2
+  "Riparazione con costo" descrive esplicitamente che la riparazione "oggi
+  ... esiste ed è gratuita e istantanea" e propone di darle un costo, non
+  di crearla.
+- Verificato io stesso, ora: repo git locale su branch `main`, `git status`
+  pulito (nessun file non tracciato o modificato); `git log` mostra 3
+  commit (iniziale + 2 fix CI); tag `v0.1.0` presente; remote `origin` →
+  `https://github.com/russus87/space-station.git`.
+- Verificato io stesso, ora: presenti sul filesystem `.gitignore`,
+  `LICENSE`, `README.md`, `packaging/PKGBUILD`, `packaging/space-station.desktop`,
+  `tools/gen_icon.py`, `.github/workflows/build.yml`.
+- Verificato io stesso, ora, via `gh release view v0.1.0 --repo
+  russus87/space-station`: release non draft, non prerelease, con i tre
+  asset richiesti presenti e con dimensioni coerenti a quanto riferito.
+- Non provato: il pacchetto Arch (`.pkg.tar.zst`) non è stato installato né
+  testato localmente, solo prodotto dalla CI — prova consigliata: `sudo
+  pacman -U` del file scaricato dalla release. Non provato neanche
+  l'eseguibile Linux/Windows generato dalla CI.
+- Nota: l'ambiente di lancio di questa sessione riportava "Is directory a
+  git repo: No" — informazione superata, probabilmente rilevata prima del
+  `git init`; il filesystem conferma ora un repo git valido e funzionante.
 
 ## Decisioni prese in sessione
-- Approccio ibrido per i livelli: generatore parametrico a seed fisso +
-  livelli curati ai punti chiave (non ancora in SPEC.md, solo in
-  SPEC-CAMPAGNA.md finché non è approvato).
-- Sblocchi sia di moduli sia di personaggi, alternati ogni 5 livelli.
-- Design doc (`SPEC-CAMPAGNA.md`) scritto e da approvare prima di scrivere
-  codice.
-- Regola +5 punti/tick per laboratorio attivo proposta come fix al difetto
-  di design emerso dal playtest (non implementata).
+- Nessuna nuova decisione di design in questa sessione: le decisioni di
+  design restano quelle già registrate (approccio ibrido generatore +
+  livelli curati, sblocchi alternati moduli/personaggi, design doc da
+  approvare prima del codice). Le novità di questa sessione sono
+  operative/infrastrutturali (repo pubblico, CI, packaging), non ancora
+  riflesse altrove perché non richiedono modifiche a SPEC.md.

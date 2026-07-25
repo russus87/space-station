@@ -3,10 +3,12 @@
 //! lascia costruire (l'HUD mostra l'anteprima del bilancio), `Esc` apre questo
 //! menu e congela tutto, timer del tick compreso.
 
+use crate::generatore;
 use crate::livelli::{
-    ClassificaInfinita, ClassificaSfida, LIVELLI, LivelloScelto, Modalita, Progressione, Record,
-    UltimoPiazzamento, giorni_fa,
+    ClassificaInfinita, ClassificaSfida, LIVELLI, LivelloCasuale, LivelloScelto, Modalita,
+    Progressione, Record, UltimoPiazzamento, giorni_fa,
 };
+use rand::RngExt;
 use crate::modules::{KINDS, TABELLA};
 use crate::sim::{MotivoFine, OSSIGENO_PER_CREW, Sim, TICK_SURRISCALDAMENTO, TICK_SECS};
 use crate::ui::{
@@ -21,7 +23,7 @@ pub enum AppState {
     #[default]
     Titolo,
     ComeSiGioca,
-    /// Campagna: lista dei sei livelli con stato completato/disponibile/bloccato.
+    /// Campagna: griglia dei 50 livelli con stato completato/disponibile/bloccato.
     SelezioneLivello,
     /// Nome, briefing e obiettivo del livello scelto, prima di cominciare.
     Briefing,
@@ -74,6 +76,8 @@ pub enum Azione {
     GiocaInfinita,
     /// Come Infinita ma col tetto di tick: classifica separata.
     GiocaSfida,
+    /// Genera un livello con seed casuale e lo gioca (fuori progressione).
+    GiocaCasuale,
     ApriClassifica,
     /// Dalla selezione livello al briefing del livello i (0-based).
     ScegliLivello(usize),
@@ -130,6 +134,31 @@ fn testo(t: impl Into<String>, px: f32, colore: Color) -> impl Bundle {
     )
 }
 
+/// Variante compatta di `voce` per la griglia dei livelli: una cella
+/// quadrata col numero, stessi componenti e stessi sistemi di navigazione.
+fn voce_cella(p: &mut ChildSpawnerCommands, idx: usize, azione: Azione, etichetta: String) {
+    p.spawn((
+        Node {
+            width: Val::Px(46.0),
+            padding: UiRect::axes(Val::Px(0.0), Val::Px(6.0)),
+            border: UiRect::all(Val::Px(1.0)),
+            justify_content: JustifyContent::Center,
+            ..default()
+        },
+        BackgroundColor(Color::NONE),
+        BorderColor::all(Color::NONE),
+        Button,
+        Voce {
+            idx,
+            azione,
+            etichetta: etichetta.clone(),
+        },
+    ))
+    .with_children(|c| {
+        c.spawn(testo(etichetta, 16.0, METALLO));
+    });
+}
+
 fn voce(p: &mut ChildSpawnerCommands, idx: usize, azione: Azione, etichetta: impl Into<String>) {
     let etichetta = etichetta.into();
     p.spawn((
@@ -172,7 +201,7 @@ fn radice_centrata() -> Node {
 pub fn entra_titolo(mut commands: Commands, mut sel: ResMut<Selezione>) {
     *sel = Selezione {
         idx: 0,
-        n: 6,
+        n: 7,
         conferma: None,
     };
     commands
@@ -200,9 +229,10 @@ pub fn entra_titolo(mut commands: Commands, mut sel: ResMut<Selezione>) {
             voce(r, 0, Azione::ApriCampagna, "Campagna");
             voce(r, 1, Azione::GiocaInfinita, "Infinita");
             voce(r, 2, Azione::GiocaSfida, "Sfida");
-            voce(r, 3, Azione::ApriClassifica, "Classifica");
-            voce(r, 4, Azione::ComeSiGioca, "Come si gioca");
-            voce(r, 5, Azione::Esci, "Esci");
+            voce(r, 3, Azione::GiocaCasuale, "Livello casuale");
+            voce(r, 4, Azione::ApriClassifica, "Classifica");
+            voce(r, 5, Azione::ComeSiGioca, "Come si gioca");
+            voce(r, 6, Azione::Esci, "Esci");
         });
 }
 
@@ -369,7 +399,7 @@ pub fn esci_guida(mut commands: Commands, q: Query<Entity, With<SchermataGuida>>
 #[derive(Component)]
 pub struct SchermataSelezione;
 
-/// I sei livelli in colonna. Solo i livelli sbloccati (completati o il primo
+/// I 50 livelli in griglia (10 per riga). Solo i livelli sbloccati (completati o il primo
 /// disponibile) sono voci navigabili; i bloccati sono testo spento, non
 /// selezionabile né cliccabile.
 pub fn entra_selezione(
@@ -379,7 +409,8 @@ pub fn entra_selezione(
 ) {
     let sbloccati = (progressione.completati + 1).min(LIVELLI.len());
     *sel = Selezione {
-        idx: 0,
+        // si parte dal primo livello non completato, non dall'1
+        idx: progressione.completati.min(sbloccati - 1),
         n: sbloccati + 1, // livelli sbloccati + Indietro
         conferma: None,
     };
@@ -398,45 +429,53 @@ pub fn entra_selezione(
             },))
             .with_children(|c| {
                 c.spawn(testo(
-                    "sei livelli in ordine: ognuno insegna un meccanismo",
+                    format!(
+                        "50 livelli in ordine — completati {} · frecce per muoverti, Invio per il briefing",
+                        progressione.completati
+                    ),
                     13.0,
                     GRIGIO_MEDIO,
                 ));
             });
-            let mut idx = 0;
-            for (i, l) in LIVELLI.iter().enumerate() {
-                if i < sbloccati {
-                    let stato = if i < progressione.completati {
-                        "completato"
-                    } else {
-                        "disponibile"
-                    };
-                    voce(
-                        r,
-                        idx,
-                        Azione::ScegliLivello(i),
-                        format!("{}. {} — {}", i + 1, l.nome, stato),
-                    );
-                    idx += 1;
-                } else {
-                    r.spawn((Node {
-                        padding: UiRect::axes(Val::Px(14.0), Val::Px(6.0)),
-                        ..default()
-                    },))
-                    .with_children(|c| {
-                        c.spawn(testo(
-                            format!("{}. {} — bloccato", i + 1, l.nome),
-                            18.0,
-                            GRIGIO_SCAFO,
-                        ));
-                    });
-                }
-            }
+            // griglia 10 per riga: i primi 6 sono i livelli curati, dal 7 in
+            // poi generati (nome e obiettivo si vedono nel briefing)
             r.spawn(Node {
-                height: Val::Px(10.0),
+                flex_direction: FlexDirection::Row,
+                flex_wrap: FlexWrap::Wrap,
+                max_width: Val::Px(10.0 * 50.0),
+                column_gap: Val::Px(4.0),
+                row_gap: Val::Px(4.0),
+                justify_content: JustifyContent::Center,
+                ..default()
+            })
+            .with_children(|griglia| {
+                for i in 0..LIVELLI.len() {
+                    if i < sbloccati {
+                        let etichetta = if i < progressione.completati {
+                            format!("{}·", i + 1) // il punto marca il completato
+                        } else {
+                            format!("{}", i + 1)
+                        };
+                        voce_cella(griglia, i, Azione::ScegliLivello(i), etichetta);
+                    } else {
+                        griglia
+                            .spawn((Node {
+                                width: Val::Px(46.0),
+                                padding: UiRect::axes(Val::Px(0.0), Val::Px(6.0)),
+                                justify_content: JustifyContent::Center,
+                                ..default()
+                            },))
+                            .with_children(|c| {
+                                c.spawn(testo(format!("{}", i + 1), 16.0, GRIGIO_SCAFO));
+                            });
+                    }
+                }
+            });
+            r.spawn(Node {
+                height: Val::Px(14.0),
                 ..default()
             });
-            voce(r, idx, Azione::IndietroTitolo, "Indietro");
+            voce(r, sbloccati, Azione::IndietroTitolo, "Indietro");
         });
 }
 
@@ -472,13 +511,13 @@ pub fn entra_briefing(
         ))
         .with_children(|r| {
             r.spawn(testo(format!("LIVELLO {}", scelto.0 + 1), 15.0, GRIGIO_MEDIO));
-            r.spawn(testo(l.nome, 34.0, BIANCO));
+            r.spawn(testo(l.nome.clone(), 34.0, BIANCO));
             r.spawn((Node {
                 margin: UiRect::top(Val::Px(12.0)),
                 ..default()
             },))
             .with_children(|c| {
-                c.spawn(testo(l.briefing, 15.0, METALLO));
+                c.spawn(testo(l.briefing.clone(), 15.0, METALLO));
             });
             r.spawn(testo(
                 format!("Obiettivo: {}", l.obiettivo.descrizione()),
@@ -614,19 +653,29 @@ pub fn esci_classifica(mut commands: Commands, q: Query<Entity, With<SchermataCl
 pub struct SchermataCompletato;
 
 /// Obiettivo raggiunto: punteggio e tick della partita, e la strada avanti.
-/// All'ultimo livello la voce "Livello successivo" non esiste.
+/// All'ultimo livello di campagna la voce "Livello successivo" non esiste;
+/// nel livello casuale al suo posto c'è "Nuovo livello casuale".
 pub fn entra_completato(
     mut commands: Commands,
     sim: Res<Sim>,
     modalita: Res<Modalita>,
+    casuale: Res<LivelloCasuale>,
     mut sel: ResMut<Selezione>,
 ) {
-    let i = match *modalita {
-        Modalita::Campagna(i) => i,
-        // non succede: lo stato si raggiunge solo in campagna
-        Modalita::Infinita | Modalita::Sfida => 0,
+    let in_casuale = matches!(*modalita, Modalita::Casuale);
+    let (intestazione, obiettivo) = match *modalita {
+        Modalita::Campagna(i) => (
+            format!("{}. {}", i + 1, LIVELLI[i].nome),
+            LIVELLI[i].obiettivo,
+        ),
+        Modalita::Casuale => match &casuale.0 {
+            Some(l) => (format!("Livello casuale — {}", l.nome), l.obiettivo),
+            None => return, // non succede: lo stato arriva solo con un livello
+        },
+        // non succede: lo stato si raggiunge solo con un obiettivo attivo
+        Modalita::Infinita | Modalita::Sfida => return,
     };
-    let ultimo = i + 1 >= LIVELLI.len();
+    let ultimo = matches!(*modalita, Modalita::Campagna(i) if i + 1 >= LIVELLI.len());
     *sel = Selezione {
         idx: 0,
         n: if ultimo { 1 } else { 2 },
@@ -641,18 +690,14 @@ pub fn entra_completato(
         ))
         .with_children(|r| {
             r.spawn(testo("LIVELLO COMPLETATO", 34.0, VERDE));
-            r.spawn(testo(
-                format!("{}. {}", i + 1, LIVELLI[i].nome),
-                15.0,
-                METALLO,
-            ));
+            r.spawn(testo(intestazione, 15.0, METALLO));
             r.spawn((Node {
                 margin: UiRect::top(Val::Px(12.0)),
                 ..default()
             },))
             .with_children(|c| {
                 c.spawn(testo(
-                    format!("Obiettivo raggiunto: {}", LIVELLI[i].obiettivo.descrizione()),
+                    format!("Obiettivo raggiunto: {}", obiettivo.descrizione()),
                     14.0,
                     GIALLO,
                 ));
@@ -678,6 +723,9 @@ pub fn entra_completato(
                     ));
                 });
                 voce(r, 0, Azione::IndietroTitolo, "Torna al titolo");
+            } else if in_casuale {
+                voce(r, 0, Azione::GiocaCasuale, "Nuovo livello casuale");
+                voce(r, 1, Azione::IndietroTitolo, "Torna al titolo");
             } else {
                 voce(r, 0, Azione::LivelloSuccessivo, "Livello successivo");
                 voce(r, 1, Azione::IndietroTitolo, "Torna al titolo");
@@ -755,6 +803,7 @@ pub fn entra_fine(
     mut commands: Commands,
     sim: Res<Sim>,
     modalita: Res<Modalita>,
+    casuale: Res<LivelloCasuale>,
     piazzamento: Res<UltimoPiazzamento>,
     mut sel: ResMut<Selezione>,
 ) {
@@ -763,7 +812,9 @@ pub fn entra_fine(
         n: 2,
         conferma: None,
     };
-    let campagna = matches!(*modalita, Modalita::Campagna(_));
+    // "Riprova il livello" vale anche per il casuale: il livello resta in
+    // `LivelloCasuale`, quindi il reset lo rigioca identico
+    let con_livello = matches!(*modalita, Modalita::Campagna(_) | Modalita::Casuale);
     commands
         .spawn((
             radice_centrata(),
@@ -781,12 +832,24 @@ pub fn entra_fine(
             };
             r.spawn(testo(titolo, 34.0, ROSSO));
             r.spawn(testo(sottotitolo, 13.0, GRIGIO_MEDIO));
-            if let Modalita::Campagna(i) = *modalita {
-                r.spawn(testo(
-                    format!("livello {}. {} non superato", i + 1, LIVELLI[i].nome),
-                    13.0,
-                    GRIGIO_MEDIO,
-                ));
+            match *modalita {
+                Modalita::Campagna(i) => {
+                    r.spawn(testo(
+                        format!("livello {}. {} non superato", i + 1, LIVELLI[i].nome),
+                        13.0,
+                        GRIGIO_MEDIO,
+                    ));
+                }
+                Modalita::Casuale => {
+                    if let Some(l) = &casuale.0 {
+                        r.spawn(testo(
+                            format!("livello casuale — {} non superato", l.nome),
+                            13.0,
+                            GRIGIO_MEDIO,
+                        ));
+                    }
+                }
+                Modalita::Infinita | Modalita::Sfida => {}
             }
             r.spawn((Node {
                 margin: UiRect::top(Val::Px(14.0)),
@@ -824,7 +887,7 @@ pub fn entra_fine(
                     ));
                 }
             });
-            if campagna {
+            if con_livello {
                 voce(r, 0, Azione::Ricomincia, "Riprova il livello");
             } else {
                 voce(r, 0, Azione::Ricomincia, "Ricomincia");
@@ -850,6 +913,7 @@ pub fn naviga(
     mut reset: ResMut<RichiestaReset>,
     mut modalita: ResMut<Modalita>,
     mut scelto: ResMut<LivelloScelto>,
+    mut casuale: ResMut<LivelloCasuale>,
     stato: Res<State<AppState>>,
     mut prossimo: ResMut<NextState<AppState>>,
     mut esci: MessageWriter<AppExit>,
@@ -889,11 +953,26 @@ pub fn naviga(
         return;
     }
 
+    // nella griglia dei livelli su/giù saltano di riga (10 celle),
+    // sinistra/destra di una; negli altri menu su/giù scorrono le voci
+    let salto = if attuale == AppState::SelezioneLivello {
+        10
+    } else {
+        1
+    };
     if tasti.just_pressed(KeyCode::ArrowUp) {
-        sel.idx = (sel.idx + sel.n - 1) % sel.n;
+        sel.idx = (sel.idx + sel.n - salto.min(sel.n)) % sel.n;
         sel.conferma = None;
     }
     if tasti.just_pressed(KeyCode::ArrowDown) {
+        sel.idx = (sel.idx + salto) % sel.n;
+        sel.conferma = None;
+    }
+    if tasti.just_pressed(KeyCode::ArrowLeft) {
+        sel.idx = (sel.idx + sel.n - 1) % sel.n;
+        sel.conferma = None;
+    }
+    if tasti.just_pressed(KeyCode::ArrowRight) {
         sel.idx = (sel.idx + 1) % sel.n;
         sel.conferma = None;
     }
@@ -909,6 +988,7 @@ pub fn naviga(
                 &mut reset,
                 &mut modalita,
                 &mut scelto,
+                &mut casuale,
                 attuale,
                 &mut prossimo,
                 &mut esci,
@@ -926,6 +1006,7 @@ pub fn click_voci(
     mut reset: ResMut<RichiestaReset>,
     mut modalita: ResMut<Modalita>,
     mut scelto: ResMut<LivelloScelto>,
+    mut casuale: ResMut<LivelloCasuale>,
     stato: Res<State<AppState>>,
     mut prossimo: ResMut<NextState<AppState>>,
     mut esci: MessageWriter<AppExit>,
@@ -950,6 +1031,7 @@ pub fn click_voci(
                     &mut reset,
                     &mut modalita,
                     &mut scelto,
+                    &mut casuale,
                     attuale,
                     &mut prossimo,
                     &mut esci,
@@ -970,6 +1052,7 @@ fn esegui(
     reset: &mut RichiestaReset,
     modalita: &mut Modalita,
     scelto: &mut LivelloScelto,
+    casuale: &mut LivelloCasuale,
     attuale: AppState,
     prossimo: &mut NextState<AppState>,
     esci: &mut MessageWriter<AppExit>,
@@ -991,6 +1074,15 @@ fn esegui(
         }
         Azione::GiocaSfida => {
             *modalita = Modalita::Sfida;
+            reset.0 = true;
+            pausa.aperta = false;
+            prossimo.set(AppState::InGioco);
+        }
+        Azione::GiocaCasuale => {
+            // il seed viene dal rand di sistema: qui la non-riproducibilità
+            // è il punto; la campagna invece usa seed fissi (generatore.rs)
+            casuale.0 = Some(generatore::genera_casuale(rand::rng().random::<u64>()));
+            *modalita = Modalita::Casuale;
             reset.0 = true;
             pausa.aperta = false;
             prossimo.set(AppState::InGioco);

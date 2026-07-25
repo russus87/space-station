@@ -24,17 +24,21 @@ restare bloccati per sempre in una stazione che si sta spegnendo lentamente
 senza riprendersi né perdere del tutto. In Infinita non c'è: lì l'idea è
 proprio vedere fin dove riesci ad arrivare, senza un orologio sopra.
 
-## Le tre modalità
+## Le quattro modalità
 
 Dal titolo scegli come giocare:
 
-- **Campagna** — sei livelli in sequenza, ognuno con un obiettivo scritto
-  in alto nell'HUD insieme al progresso ("equipaggio 5/8", "12/15 tick").
-  Il livello si vince raggiungendo l'obiettivo; si perde perdendo la
-  stazione o a tetto di tick raggiunto, e in entrambi i casi puoi riprovare
-  subito. Completare un livello **sblocca il successivo**, e il gioco se lo
-  ricorda tra una sessione e l'altra. Il punteggio si vede anche qui, ma
-  non va in classifica.
+- **Campagna** — **50 livelli** in sequenza, ognuno con un obiettivo
+  scritto in alto nell'HUD insieme al progresso ("equipaggio 5/8", "12/15
+  tick"). I primi 6 insegnano i meccanismi uno alla volta; dal 7 in poi i
+  livelli crescono di difficoltà (più detriti, budget più stretti,
+  obiettivi più lunghi) e sono uguali per tutti. Il livello si vince
+  raggiungendo l'obiettivo; si perde perdendo la stazione o a tetto di
+  tick raggiunto, e in entrambi i casi puoi riprovare subito. Completare
+  un livello **sblocca il successivo**, e il gioco se lo ricorda tra una
+  sessione e l'altra. Il punteggio si vede anche qui, ma non va in
+  classifica. Nella griglia di selezione le frecce su/giù saltano di riga,
+  sinistra/destra di casella.
 - **Infinita** — la sandbox senza obiettivi e senza tetto di tick:
   costruisci, resisti quanto riesci, fai punti. Va nella classifica
   **Infinita**.
@@ -43,11 +47,16 @@ Dal titolo scegli come giocare:
   tempo fisso. Va in una classifica **separata**, la Sfida: i punteggi
   delle due sandbox non si mescolano, perché uno ha un limite di tempo e
   l'altro no.
+- **Livello casuale** — un livello mai visto, generato al momento:
+  obiettivo, detriti e budget nella fascia media della campagna. Fuori da
+  progressione e classifiche; se lo perdi puoi riprovare **lo stesso**
+  livello, se lo vinci te ne genera un altro.
 
-### I sei livelli della campagna
+### I primi sei livelli della campagna
 
-Ogni livello insegna un meccanismo, nell'ordine in cui il gioco te li fa
-incontrare:
+Ogni livello del blocco iniziale insegna un meccanismo, nell'ordine in cui
+il gioco te li fa incontrare (dal 7 al 50 si mette tutto insieme, con
+difficoltà crescente):
 
 | # | Nome | Obiettivo | Moduli |
 |---|---|---|---|

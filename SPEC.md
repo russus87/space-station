@@ -535,11 +535,31 @@ che modalità si sta giocando; il sistema degli obiettivi gira **solo** in
 Campagna (run condition `campagna_attiva`) — Sfida non ha obiettivi, come
 Infinita.
 
-### 13.2 I sei livelli
+### 13.2 I livelli: 6 curati + 44 generati (50 totali)
 
-Tabella unica di costanti: `LIVELLI` in `src/livelli.rs`, sul modello di
-`TABELLA` in `modules.rs` — è lì che si tarano nomi, briefing e numeri.
-I testi degli obiettivi sono generati dai numeri (`Obiettivo::descrizione`).
+`LIVELLI` in `src/livelli.rs` è ora un `LazyLock<Vec<LivelloDef>>`: i primi
+6 livelli sono curati a mano (tabella qui sotto, invariata), dal 7 al 50
+arrivano da `src/generatore.rs` con **seed fisso derivato dall'indice** —
+il livello 23 è identico per tutti e a ogni avvio, quindi si può
+bilanciare guardandolo. Il generatore scala obiettivo, detriti (quota
+0→12, pattern: sparsi/muro/diagonale/croce) e budget moduli (fabbisogno
+minimo × margine 1,6→1,15) sull'indice; il PRNG è uno splitmix64 interno,
+non la crate `rand`, così la sequenza non cambia mai con un aggiornamento
+di dipendenza. **Garanzia di risolvibilità testata a ogni build**: budget
+≥ `fabbisogno_minimo(obiettivo)` (stessa funzione usata dal generatore) e
+area libera ortogonalmente connessa ≥ budget (flood fill), su tutti i 50
+livelli più 200 seed casuali.
+
+C'è anche una modalità **Livello casuale** (voce del titolo): stesso
+generatore, seed dal rand di sistema, difficoltà pescata nella fascia
+10–40 della curva. Obiettivo attivo come in campagna ma fuori da
+progressione e classifiche; a livello completato la schermata propone
+"Nuovo livello casuale", a stazione persa "Riprova il livello" rigioca lo
+stesso seed (il livello resta nella risorsa `LivelloCasuale`).
+
+I sei livelli curati — tabella di costanti sul modello di `TABELLA` in
+`modules.rs`, è lì che si tarano nomi, briefing e numeri. I testi degli
+obiettivi sono generati dai numeri (`Obiettivo::descrizione`).
 
 | # | Nome | Briefing | Obiettivo | Moduli max |
 |---|---|---|---|---|
@@ -579,10 +599,13 @@ Semantica:
 Stessi componenti (`Voce`/`Azione`) e stessi sistemi di navigazione dei menu
 esistenti, non duplicati.
 
-- **Titolo**: Campagna, Infinita, Sfida, Classifica, Come si gioca, Esci.
-- **Selezione livello**: i 6 livelli con stato completato / disponibile /
-  bloccato; i bloccati sono testo spento, non selezionabile. Esc/Indietro
-  torna al titolo.
+- **Titolo**: Campagna, Infinita, Sfida, Livello casuale, Classifica,
+  Come si gioca, Esci.
+- **Selezione livello**: griglia 10×5 di celle numerate (completato =
+  numero col punto, disponibile = navigabile, bloccato = testo spento non
+  selezionabile); la selezione parte dal primo livello non completato.
+  Frecce su/giù saltano di riga (±10), sinistra/destra di cella; Invio
+  apre il briefing. Esc/Indietro torna al titolo.
 - **Briefing**: nome, briefing e obiettivo per esteso + "Inizia".
 - **Classifica**: due colonne affiancate, Infinita e Sfida, ciascuna con la
   propria top 10 (posizione, punteggio, tick, equipaggio massimo, quanto

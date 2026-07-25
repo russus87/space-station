@@ -4,7 +4,7 @@
 //! e al resize i testi si scollavano dalla scena.
 //! Solo la griglia e i moduli restano in world-space (vedi `main.rs`).
 
-use crate::livelli::{LIVELLI, Modalita, StatoLivello};
+use crate::livelli::{LIVELLI, LivelloCasuale, Modalita, StatoLivello};
 use crate::menu::{AppState, Pausa};
 use crate::modules::{KINDS, ModuleKind};
 use crate::sim::{
@@ -440,6 +440,7 @@ pub fn update_hud(
     sim: Res<Sim>,
     pausa: Res<Pausa>,
     modalita: Res<Modalita>,
+    casuale: Res<LivelloCasuale>,
     stato_livello: Res<StatoLivello>,
     moduli: Query<(), With<Module>>,
     mut q: Query<(&CampoHud, &mut Text, &mut TextColor)>,
@@ -556,18 +557,25 @@ pub fn update_hud(
                 };
                 c.0 = col_crew;
             }
-            CampoHud::Obiettivo => match *modalita {
-                Modalita::Campagna(i) => {
-                    t.0 = format!(
-                        "{}   moduli {}/{}",
-                        LIVELLI[i].obiettivo.progresso(&sim, &stato_livello),
-                        moduli.iter().count(),
-                        LIVELLI[i].max_moduli
-                    );
-                    c.0 = if stato_livello.completato { VERDE } else { GIALLO };
+            CampoHud::Obiettivo => {
+                let livello = match *modalita {
+                    Modalita::Campagna(i) => Some(&LIVELLI[i]),
+                    Modalita::Casuale => casuale.0.as_ref(),
+                    Modalita::Infinita | Modalita::Sfida => None,
+                };
+                match livello {
+                    Some(l) => {
+                        t.0 = format!(
+                            "{}   moduli {}/{}",
+                            l.obiettivo.progresso(&sim, &stato_livello),
+                            moduli.iter().count(),
+                            l.max_moduli
+                        );
+                        c.0 = if stato_livello.completato { VERDE } else { GIALLO };
+                    }
+                    None => t.0.clear(),
                 }
-                Modalita::Infinita | Modalita::Sfida => t.0.clear(),
-            },
+            }
             CampoHud::Punteggio => {
                 t.0 = format!("PUNTI {}", sim.punteggio);
                 c.0 = GRIGIO_MEDIO;

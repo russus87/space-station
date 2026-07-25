@@ -8,12 +8,15 @@ e tenerlo vivo: il punteggio è persone·tick e la partita finisce quando
 l'equipaggio torna a zero. Rust + Bevy 0.19, pixel art generata da script
 (`tools/gen_sprites.py`).
 
-Tre modalità: la **Campagna** (sei livelli in sequenza con obiettivo
-misurabile nell'HUD, detriti da aggirare e un budget di moduli per livello;
-completarne uno sblocca il successivo), l'**Infinita** (sandbox senza
-obiettivi né limiti di tempo) e la **Sfida** (come l'Infinita ma con un
-tetto di 400 tick: partite brevi e confrontabili). Infinita e Sfida hanno
-ciascuna la propria **classifica** locale top 10. Classifiche e
+Quattro modalità: la **Campagna** (50 livelli in sequenza — 6 curati che
+insegnano i meccanismi, 44 generati con seed fisso a difficoltà crescente —
+con obiettivo misurabile nell'HUD, detriti da aggirare e un budget di
+moduli per livello; completarne uno sblocca il successivo), l'**Infinita**
+(sandbox senza obiettivi né limiti di tempo), la **Sfida** (come
+l'Infinita ma con un tetto di 400 tick: partite brevi e confrontabili) e
+il **Livello casuale** (generato al momento, fuori da progressione e
+classifiche). Infinita e Sfida hanno ciascuna la propria **classifica**
+locale top 10. Classifiche e
 progressione della campagna sono file di testo semplice in
 `$XDG_DATA_HOME/space-station/` (ripiego `~/.local/share/space-station/`):
 una riga malformata si ignora, un file assente vale "nessun dato". I
@@ -76,9 +79,10 @@ entrato in top 10.
 - **`src/modules.rs` → `TABELLA`**: produzione/consumo per tick di ogni modulo
   (energia, ossigeno, calore, posti letto, equipaggio richiesto) più il path
   del suo sprite. È l'unico punto da toccare per cambiare i numeri.
-- **`src/livelli.rs` → `LIVELLI`**: nomi, briefing e numeri degli obiettivi
-  dei sei livelli della campagna. I testi mostrati sono generati dai numeri:
-  si tara qui e basta.
+- **`src/livelli.rs` → `livelli_curati()`**: nomi, briefing e numeri dei 6
+  livelli curati della campagna. I 44 generati si tarano in
+  **`src/generatore.rs`** (curva di difficoltà, quota detriti, margine sul
+  budget). I testi mostrati sono generati dai numeri: si tara qui e basta.
 - **`src/sim.rs` → costanti in testa**, le quattro che contano:
   - `OSSIGENO_PER_CREW` (10): consumo d'aria per membro per tick — decide
     quanti equipaggi regge un Life Support.
@@ -108,7 +112,7 @@ e in `src/ui.rs` — e va tenuta allineata a `SPEC.md` §2.2.
 |---|---|
 | `src/sim.rs` | tick di bilancio, reti elettriche per adiacenza, cascata di guasti, punteggio e fine partita. **È il cuore validato: non si ridisegna.** |
 | `src/modules.rs` | la tabella dei moduli |
-| `src/livelli.rs` | modalità, tabella dei sei livelli e obiettivi, classifica e progressione persistenti |
+| `src/livelli.rs` | modalità, i 6 livelli curati + i 44 generati (50 totali), obiettivi, classifiche e progressione persistenti |
 | `src/main.rs` | griglia, piazzamento, autotiling dei corridoi, scala responsive, stati dell'app |
 | `src/ui.rs` | HUD (risorse + obiettivo di livello + punteggio), palette laterale, pannello ispezione, log |
 | `src/menu.rs` | titolo, campagna (selezione livello, briefing, livello completato), classifica, "come si gioca", pausa, fine partita |
