@@ -12,6 +12,8 @@ mod menu;
 mod mercato;
 mod musica;
 mod personaggi;
+mod progressi;
+mod prologo;
 mod modules;
 mod sim;
 mod ui;
@@ -227,6 +229,9 @@ fn main() {
         .init_resource::<livelli::LivelloCasuale>()
         .init_resource::<mercato::Mercato>()
         .init_resource::<musica::StatoMusica>()
+        .init_resource::<livelli::UltimaMedaglia>()
+        .init_resource::<prologo::Prologo>()
+        .insert_resource(progressi::carica())
         .insert_resource(impostazioni::carica())
         .init_resource::<livelli::UltimoPiazzamento>()
         // classifiche e progressione si leggono dal disco una volta
@@ -242,6 +247,8 @@ fn main() {
             Startup,
             (font_principale, carica_art, audio::carica_suoni, (setup, ui::setup_ui)).chain(),
         )
+        .add_systems(OnEnter(AppState::Marketplace), menu::entra_marketplace)
+        .add_systems(OnExit(AppState::Marketplace), menu::esci_marketplace)
         .add_systems(OnEnter(AppState::LivelloCompletato), audio::suona_completato)
         .add_systems(OnEnter(AppState::FinePartita), audio::suona_sconfitta)
         .add_systems(OnEnter(AppState::Titolo), menu::entra_titolo)
@@ -277,13 +284,16 @@ fn main() {
             Update,
             (
                 cursore_sopra,
-                input_tastiera,
-                input_mouse,
+                // col prologo aperto la stazione non si tocca: né tasti
+                // (Spazio compreso) né click di costruzione né mercato
+                input_tastiera.run_if(not(prologo::attivo)),
+                input_mouse.run_if(not(prologo::attivo)),
+                prologo::click,
                 ui::click_palette,
                 ui::click_bottone_menu,
-                mercato::toggle_tasto,
-                mercato::click_bottone,
-                mercato::click_offerte,
+                mercato::toggle_tasto.run_if(not(prologo::attivo)),
+                mercato::click_bottone.run_if(not(prologo::attivo)),
+                mercato::click_scorte,
                 sim::sim_tick.run_if(sim_attiva),
                 applica_gru,
                 // in Infinita/Sfida il codice degli obiettivi non gira proprio
@@ -301,12 +311,14 @@ fn main() {
                 aggiorna_visuali,
                 orienta_corridoi,
                 mercato::sincronizza,
+                prologo::sincronizza,
                 audio::suona_log,
                 audio::suona_arrivi,
                 audio::suona_click,
                 musica::gestisci_musica,
                 musica::applica_volume,
                 menu::aggiorna_voci_volume,
+                menu::aggiorna_voci_marketplace,
                 screenshot_tasto,
                 demo_foto,
                 visibilita_scena,
@@ -1076,6 +1088,7 @@ fn applica_reset(
     mut stato_livello: ResMut<livelli::StatoLivello>,
     mut offerte: ResMut<mercato::Mercato>,
     mut stato_musica: ResMut<musica::StatoMusica>,
+    mut prologo_res: ResMut<prologo::Prologo>,
     modalita: Res<Modalita>,
     casuale: Res<livelli::LivelloCasuale>,
     griglia: Res<Griglia>,
@@ -1137,7 +1150,8 @@ fn applica_reset(
         }
         log.info(0, format!("Moduli disponibili: {}", livello.max_moduli));
         log.info(0, "Costruisci e premi Spazio");
-        offerte.rinnova(true, !livello.ostacoli.is_empty());
+        // il prologo a fumetto copre la griglia finché non si preme Gioca!
+        prologo_res.pagina = Some(0);
     } else {
         match *modalita {
             Modalita::Sfida => log.info(
@@ -1146,8 +1160,9 @@ fn applica_reset(
             ),
             _ => log.info(0, "Nuova stazione: costruisci e premi Spazio"),
         }
-        offerte.rinnova(false, false);
+        prologo_res.pagina = None;
     }
+    offerte.aperto = false;
 }
 
 #[cfg(test)]

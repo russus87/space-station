@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <title>Space Station — Manuale di bordo</title>
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="description" content="Manuale di gioco di Space Station, in formato fanzine — regole, moduli, equipaggio, mercato, comandi.">
+<meta name="description" content="Manuale di gioco di Space Station, in formato fanzine — regole, moduli, equipaggio, marketplace, comandi.">
 <meta name="color-scheme" content="dark">
 <style>
 :root{
@@ -538,8 +538,10 @@ hr.torn{
   <div class="callout info" style="margin-top:26px">
     <div class="sticker">promemoria</div>
     <p style="margin-top:6px"><b>Tetto dei tick:</b> in Campagna, Sfida e
-    Livello casuale la partita si chiude comunque a 400 tick ("TEMPO
-    SCADUTO"). Solo l'Infinita non ha orologio.</p>
+    Livello casuale la partita si chiude comunque a 400 tick — e nell'HUD
+    è un orologio vero, che scende da <b>TEMPO 4:40</b>: bianco finché
+    c'è margine, poi giallo, poi rosso negli ultimi respiri ("TEMPO
+    SCADUTO" a zero). Solo l'Infinita non ha orologio.</p>
   </div>
 
   <figure class="shot r2">
@@ -766,6 +768,13 @@ hr.torn{
       arrivi), una pagina a testa per chi ha qualcosa da dire; le battute
       dei briefing fanno il resto, una scheggia per volta, fino a un finale
       che chiude i conti di tutti.</p>
+      <p>E prima ancora del briefing scritto, ogni livello — campagna o
+      casuale — apre il sipario: la griglia si scurisce e il personaggio di
+      turno compare a figura intera dentro una nuvola di fumetto vera, coda
+      a pallini compresa. Il bottone <b>Avanti</b> gira pagina e mostra
+      l'obiettivo, poi non resta che <b>Gioca!</b> Il fumetto è il sipario,
+      non il libretto d'istruzioni — quello resta nell'HUD, dove serve
+      davvero.</p>
     </div>
     <div class="side">
       <div class="callout ok">
@@ -927,6 +936,17 @@ hr.torn{
         Infinita e Sfida hanno classifiche separate apposta: senza tetto di
         tick, l'Infinita vincerebbe sempre solo durando.</p>
       </div>
+      <div class="callout tip" style="margin-top:18px">
+        <div class="sticker">medaglie</div>
+        <p style="margin-top:6px">Solo in Campagna: chiudi un livello entro
+        il <b>40%</b> del tempo limite e prendi l'<b>oro</b>, entro il
+        <b>70%</b> l'<b>argento</b>, entro il tetto il <b>rame</b>. Nella
+        griglia di selezione il numero del livello si colora di
+        conseguenza (oro = giallo, argento = bianco, rame = ruggine) e la
+        prima volta che migliori una medaglia incassi crediti — pochi,
+        apposta: rame 1, argento 2, oro 3. Si spendono al Marketplace,
+        capitolo 5.</p>
+      </div>
       <p style="font-size:0.86rem; color:var(--dim)">Tutto si salva in file
       di testo semplici in
       <code>~/.local/share/space-station/</code>
@@ -964,50 +984,59 @@ hr.torn{
 <!-- ============ CAP 5: MERCATO ============ -->
 <section class="section">
   <div class="kicker">capitolo 5</div>
-  <h2 class="zine-title">Il mercato interno</h2>
-  <p class="lead">Premi <span class="key">M</span> (o il bottone MERCATO
-  nell'HUD) durante la partita: si apre il mercato interno della stazione.
-  Ogni partita offre <b>3 facilities</b> pescate a caso dal catalogo,
-  ognuna acquistabile <b>una sola volta</b>, pagando in <b>punti</b> della
-  partita: il punteggio scende di quanto spendi. Comprare aiuta adesso e
-  costa in classifica — è il patto.</p>
+  <h2 class="zine-title">Il Marketplace</h2>
+  <p class="lead">Il <b>Marketplace</b> non è in partita: è una voce del
+  <b>menu principale</b>. Ci si compra con il <b>saldo crediti</b> — quello
+  che guadagni completando livelli di campagna e prendendo medaglie (vedi
+  capitolo 4). Ogni facility comprata diventa una <b>scorta</b> persistente
+  nel tuo portafoglio, non un acquisto usa-e-getta della singola run: resta
+  lì finché non la consumi, anche su partite diverse.</p>
+
+  <p>In partita premi <span class="key">M</span> (o il bottone
+  <b>SCORTE</b> nell'HUD) per aprire l'inventario di quello che hai in
+  magazzino: un click su una scorta la consuma e ne applica subito
+  l'effetto. Una scorta che qui non servirebbe a niente (ampliamento senza
+  budget moduli, sonda senza detriti da demolire) si mostra spenta col
+  motivo, così non la sprechi per errore.</p>
 
   <div class="callout info">
     <div class="sticker">nessun euro coinvolto</div>
     <p style="margin-top:6px">Nessuna valuta reale, nessuna transazione:
-    tutto succede dentro il gioco, tutto è gratis nel mondo vero. Il
-    "mercato" è solo un altro modo di dire "sacrifica punteggio per
-    respirare ancora un po'".</p>
+    il giro è tutto interno al gioco. <b>Medaglia</b> in campagna →
+    <b>credito</b> in tasca → <b>scorta</b> comprata al Marketplace →
+    scorta consumata in partita quando serve respirare ancora un po'. I
+    crediti sono pochi apposta (capitolo 4): il Marketplace accorcia i
+    livelli, non li regala.</p>
   </div>
 
   <div class="tag-grid">
     <div class="tag">
-      <div class="price">80 <span>punti</span></div>
+      <div class="price">2 <span>crediti</span></div>
       <h4>Scorta d'ossigeno</h4>
       <p>Riserva d'ossigeno subito al massimo.</p>
     </div>
     <div class="tag">
-      <div class="price">60 <span>punti</span></div>
+      <div class="price">2 <span>crediti</span></div>
       <h4>Spurgo termico</h4>
       <p>Azzera il surriscaldamento accumulato.</p>
     </div>
     <div class="tag">
-      <div class="price">100 <span>punti</span></div>
-      <h4>Ampliamento stiva</h4>
-      <p>+2 al budget moduli <i>(solo nei livelli col budget)</i>.</p>
-    </div>
-    <div class="tag">
-      <div class="price">120 <span>punti</span></div>
+      <div class="price">3 <span>crediti</span></div>
       <h4>Squadra di riparazione</h4>
       <p>Ripara tutte le avarie in un colpo.</p>
     </div>
     <div class="tag">
-      <div class="price">150 <span>punti</span></div>
+      <div class="price">3 <span>crediti</span></div>
+      <h4>Ampliamento stiva</h4>
+      <p>+2 al budget moduli <i>(solo nei livelli col budget)</i>.</p>
+    </div>
+    <div class="tag">
+      <div class="price">4 <span>crediti</span></div>
       <h4>Trasporto coloni</h4>
       <p>+2 equipaggio subito, se ci sono posti letto.</p>
     </div>
     <div class="tag">
-      <div class="price">200 <span>punti</span></div>
+      <div class="price">5 <span>crediti</span></div>
       <h4>Sonda demolitrice</h4>
       <p>Rimuove il detrito più vicino al centro <i>(solo se ci sono detriti)</i>.</p>
     </div>
@@ -1032,7 +1061,7 @@ hr.torn{
         <tr><td>click destro</td><td>rimuove il modulo sulla cella</td></tr>
         <tr><td><span class="key">R</span></td><td>ripara il modulo in avaria sotto il cursore</td></tr>
         <tr><td><span class="key">Spazio</span></td><td>avvia/ferma la simulazione (da fermi si costruisce senza conseguenze, l'HUD mostra l'anteprima)</td></tr>
-        <tr><td><span class="key">M</span></td><td>apre il mercato interno</td></tr>
+        <tr><td><span class="key">M</span></td><td>apre le scorte (il Marketplace si compra dal menu principale)</td></tr>
         <tr><td><span class="key">Esc</span></td><td>menu di pausa (congela anche il tempo) — anche col bottone MENU nell'HUD</td></tr>
         <tr><td>frecce + <span class="key">Invio</span></td><td>navigano i menu</td></tr>
         <tr><td>frecce nella griglia livelli</td><td>su/giù cambia riga, sinistra/destra cella</td></tr>

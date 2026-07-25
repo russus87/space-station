@@ -9,7 +9,7 @@ use crate::menu::{AppState, Pausa};
 use crate::modules::{KINDS, ModuleKind};
 use crate::sim::{
     EventLog, Fermo, Gravita, Module, O2_MAX, SOGLIA_O2_CRITICO, Sim,
-    TICK_SURRISCALDAMENTO,
+    TICK_SECS, TICK_SURRISCALDAMENTO,
 };
 use crate::{Art, Selected, SottoCursore};
 use bevy::prelude::*;
@@ -23,6 +23,7 @@ pub const METALLO: Color = Color::srgb_u8(0x8C, 0x99, 0xA8);
 pub const BIANCO: Color = Color::srgb_u8(0xD8, 0xDE, 0xE6);
 #[allow(dead_code)] // la palette resta completa: e' il riferimento per gli sprite
 pub const ARANCIO: Color = Color::srgb_u8(0xF2, 0xA3, 0x3C);
+pub const RUGGINE: Color = Color::srgb_u8(0xB3, 0x54, 0x1E);
 pub const CIANO: Color = Color::srgb_u8(0x4F, 0xC3, 0xE8);
 pub const VERDE: Color = Color::srgb_u8(0x57, 0xC2, 0x5B);
 pub const GIALLO: Color = Color::srgb_u8(0xF2, 0xD2, 0x4B);
@@ -268,7 +269,7 @@ pub fn setup_ui(mut commands: Commands, art: Res<Art>) {
                     BottoneMercato,
                 ))
                 .with_children(|c| {
-                    c.spawn(testo("MERCATO m", 13.0, METALLO));
+                    c.spawn(testo("SCORTE m", 13.0, METALLO));
                 });
                 // uscita sempre visibile: il menu esisteva solo dietro Esc e
                 // al playtest nessuno l'ha trovato — un tasto a schermo è
@@ -518,11 +519,26 @@ pub fn update_hud(
                     t.0 = "MENU".into();
                     c.0 = METALLO;
                 } else if sim.running {
-                    t.0 = match sim.tetto_tick {
-                        Some(tetto) => format!("TICK {}/{tetto}", sim.tick),
-                        None => format!("TICK {}", sim.tick),
-                    };
-                    c.0 = BIANCO;
+                    // col tetto il contatore diventa un timer vero: minuti e
+                    // secondi che scendono, e il colore avvisa prima del testo
+                    match sim.tetto_tick {
+                        Some(tetto) => {
+                            let restanti = tetto.saturating_sub(sim.tick);
+                            let secondi = (restanti as f32 * TICK_SECS) as u64;
+                            t.0 = format!("TEMPO {}:{:02}", secondi / 60, secondi % 60);
+                            c.0 = if restanti * 10 <= tetto {
+                                ROSSO
+                            } else if restanti * 4 <= tetto {
+                                GIALLO
+                            } else {
+                                BIANCO
+                            };
+                        }
+                        None => {
+                            t.0 = format!("TICK {}", sim.tick);
+                            c.0 = BIANCO;
+                        }
+                    }
                 } else if sim.tick == 0 && !moduli.is_empty() {
                     // playtest: a stazione costruita, "PAUSA" non spiegava il
                     // passo successivo. Prima del primo avvio il campo diventa

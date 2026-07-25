@@ -242,27 +242,44 @@ ai traguardi 5, 15, 25, 35 e 45, si sblocca un modulo nuovo — ed è lì che
 i livelli cominciano a pretenderlo. Nella griglia di selezione le frecce
 su/giù saltano di riga, sinistra/destra di casella.
 
+All'avvio del livello la griglia si oscura e il personaggio di turno ti
+accoglie con un **fumetto a tutto schermo**: "Avanti" mostra l'obiettivo,
+"Gioca!" ti lascia al cantiere.
+
+**Il tempo è una risorsa.** Il tetto della partita si legge come un
+**timer** nell'HUD (`TEMPO 4:40`, che ingiallisce e poi arrossisce), e la
+velocità paga: completare il livello entro il **40%** del tempo vale la
+**medaglia d'oro**, entro il **70%** l'**argento**, entro il limite il
+**rame**. La medaglia colora il numero del livello nella griglia di
+selezione (oro, bianco-argento, ruggine) e frutta **crediti** per il
+Marketplace — una tantum, solo quando migliori: rame 1, argento 2, oro 3.
+Pochi, di proposito.
+
 ---
 
-## 5. Il mercato interno
+## 5. Il Marketplace e le scorte
 
-Premi **M** (o il bottone MERCATO nell'HUD) durante la partita: si apre
-il mercato interno della stazione. Ogni partita offre **3 facilities**
-pescate a caso dal catalogo, ognuna acquistabile **una sola volta**,
-pagando in **punti** della partita: il punteggio scende di quanto spendi.
-Comprare aiuta adesso e costa in classifica — è il patto.
+Dal **titolo** si apre il **Marketplace**: il catalogo delle facilities,
+che si compra coi **crediti delle medaglie** (§4). Quello che compri
+diventa **scorta** persistente; in partita premi **M** (o il bottone
+SCORTE nell'HUD) per aprire l'inventario e **usare** una scorta — che si
+consuma. Le scorte senza senso nel contesto (l'ampliamento stiva dove non
+c'è budget, la sonda senza detriti) restano in magazzino, spente.
 
-*Nessuna valuta reale, nessuna transazione: tutto succede dentro il
-gioco, tutto è gratis nel mondo vero.*
+*Nessuna valuta reale, nessuna transazione: i crediti si guadagnano solo
+giocando, tutto è gratis nel mondo vero.*
 
-| Facility | Costo (punti) | Effetto |
+| Facility | Costo (crediti) | Effetto |
 |---|---|---|
-| **Scorta d'ossigeno** | 80 | riserva d'ossigeno subito al massimo |
-| **Spurgo termico** | 60 | azzera il surriscaldamento accumulato |
-| **Ampliamento stiva** | 100 | +2 al budget moduli *(offerta solo nei livelli col budget)* |
-| **Squadra di riparazione** | 120 | ripara tutte le avarie in un colpo |
-| **Trasporto coloni** | 150 | +2 equipaggio subito, se ci sono posti letto |
-| **Sonda demolitrice** | 200 | rimuove il detrito più vicino al centro *(offerta solo se ci sono detriti)* |
+| **Scorta d'ossigeno** | 2 | riserva d'ossigeno subito al massimo |
+| **Spurgo termico** | 2 | azzera il surriscaldamento accumulato |
+| **Squadra di riparazione** | 3 | ripara tutte le avarie in un colpo |
+| **Ampliamento stiva** | 3 | +2 al budget moduli *(usabile solo nei livelli col budget)* |
+| **Trasporto coloni** | 4 | +2 equipaggio subito, se ci sono posti letto |
+| **Sonda demolitrice** | 5 | rimuove il detrito più vicino al centro *(usabile solo se ci sono detriti)* |
+
+I crediti sono pochi e i prezzi cattivi, di proposito: una scorta ti
+risolve mezzo livello, deve costare mezze campagne.
 
 ---
 
@@ -277,7 +294,7 @@ gioco, tutto è gratis nel mondo vero.*
 | click destro | rimuove il modulo sulla cella |
 | `R` | ripara il modulo in avaria sotto il cursore |
 | `Spazio` | avvia/ferma la simulazione (da fermi si costruisce senza conseguenze, l'HUD mostra l'anteprima) |
-| `M` | apre il mercato interno |
+| `M` | apre le scorte comprate nel Marketplace |
 | `Esc` | menu di pausa (congela anche il tempo) — anche col bottone MENU nell'HUD |
 | frecce + `Invio` | navigano i menu |
 | frecce nella griglia livelli | su/giù cambia riga, sinistra/destra cella |

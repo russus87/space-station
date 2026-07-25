@@ -17,12 +17,17 @@ mostra punteggio, tick sopravvissuti ed equipaggio massimo raggiunto. Ogni
 guasto innesca una catena di conseguenze, e il registro eventi in basso te
 la racconta riga per riga.
 
-In Campagna e in Sfida c'è anche un **tetto di 400 tick** (lo vedi accanto
-al contatore in alto, `TICK n/400`): oltre quella soglia la partita finisce
-comunque, con "TEMPO SCADUTO" invece di "STAZIONE PERSA". Serve a non
-restare bloccati per sempre in una stazione che si sta spegnendo lentamente
-senza riprendersi né perdere del tutto. In Infinita non c'è: lì l'idea è
-proprio vedere fin dove riesci ad arrivare, senza un orologio sopra.
+In Campagna, Sfida e Livello casuale c'è un **tempo limite**, mostrato
+come timer nell'HUD (`TEMPO 4:40`, ingiallisce e poi arrossisce): allo
+scadere la partita finisce con "TEMPO SCADUTO" invece di "STAZIONE
+PERSA". In Infinita non c'è: lì l'idea è proprio vedere fin dove riesci
+ad arrivare, senza un orologio sopra.
+
+In campagna il tempo fa anche le **medaglie**: finisci il livello entro
+il 40% del limite ed è **oro**, entro il 70% **argento**, entro il limite
+**rame**. La medaglia colora il numero del livello nella griglia di
+selezione e frutta **crediti** (1/2/3, solo quando migliori) da spendere
+nel **Marketplace** del titolo per comprare scorte.
 
 ## Le quattro modalità
 
@@ -132,7 +137,7 @@ con il 2). Un modulo fermo mostra un simbolo che dice il perché:
 | Click sinistro | Piazza il modulo selezionato nella cella libera |
 | Click destro | Rimuove il modulo sotto il cursore (perso, non recuperabile) |
 | `R` | Ripara il modulo in avaria sotto il cursore (gratis) |
-| `M` | Apre il mercato interno: 3 offerte casuali a partita, si pagano coi punti (mai soldi veri) |
+| `M` | Apre le scorte: le facilities comprate nel Marketplace (dal titolo) coi crediti delle medaglie |
 | `Spazio` | Avvia/ferma la simulazione |
 | `Esc` | Apre il menu di pausa (riprendi, volumi di musica ed effetti, ricomincia, torna al titolo) |
 | `F12` | Salva uno screenshot nella cartella corrente |

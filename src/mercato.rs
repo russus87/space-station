@@ -1,23 +1,28 @@
-//! Mercato interno: facilities una tantum comprate coi PUNTI della partita.
+//! Catalogo delle facilities e SCORTE in partita.
 //!
-//! Nessuna valuta reale e nessuna transazione: si paga col punteggio, che
-//! scende — comprare aiuta adesso ma costa in classifica, ed è tutta lì la
-//! decisione. Ogni partita pesca 3 offerte dal catalogo `FACILITIES`
-//! (filtrate su ciò che ha senso: l'ampliamento stiva solo dove c'è un
-//! budget moduli, la sonda solo se ci sono detriti); ognuna si compra una
-//! volta sola. Tasto `M` o bottone MERCATO nell'HUD.
+//! Le facilities si comprano nel **Marketplace** del menu principale
+//! (`menu.rs`) coi CREDITI delle medaglie (`progressi.rs`) — pochi e
+//! sudati, mai valuta reale. Quelle comprate diventano scorte persistenti
+//! (`Portafoglio::scorte`); in partita il tasto `M` (o il bottone
+//! nell'HUD) apre questo overlay, che le elenca: click su una scorta = la
+//! si consuma e l'effetto si applica subito. Una scorta che qui non
+//! avrebbe effetto (ampliamento senza budget moduli, sonda senza detriti)
+//! si mostra spenta col motivo e non si può sprecare.
 
 use crate::menu::{AppState, Pausa};
-use crate::sim::{EventLog, Gravita, Module, O2_MAX, Sim};
+use crate::progressi::Portafoglio;
+use crate::sim::{EventLog, Module, O2_MAX, Sim};
 use crate::ui::{BIANCO, CIANO, GIALLO, GRIGIO_MEDIO, GRIGIO_SCAFO, METALLO, NERO, SCAFO_SCURO};
 use crate::{GRID_H, GRID_W, Ostacolo, Station};
 use bevy::prelude::*;
-use rand::RngExt;
 
 pub struct FacilityDef {
     pub nome: &'static str,
     pub descrizione: &'static str,
-    pub costo: u64,
+    /// Costo nel Marketplace, in crediti-medaglia. Volutamente caro
+    /// rispetto a quanto rendono le medaglie (3/2/1): questi aiuti
+    /// accorciano i livelli, non devono piovere.
+    pub costo_crediti: u32,
     effetto: Effetto,
 }
 
@@ -31,82 +36,82 @@ enum Effetto {
     Demolizione,
 }
 
-/// Il catalogo completo. I costi sono in punti partita (persone·tick):
-/// tarati perché comprare presto sia quasi impossibile e comprare tardi
-/// sia una rinuncia visibile in classifica.
+/// Il catalogo completo, in ordine di prezzo crescente a parità di tema.
 pub const FACILITIES: [FacilityDef; 6] = [
     FacilityDef {
         nome: "Scorta d'ossigeno",
         descrizione: "riserva d'ossigeno subito al massimo",
-        costo: 80,
+        costo_crediti: 2,
         effetto: Effetto::Ossigeno,
     },
     FacilityDef {
         nome: "Squadra di riparazione",
         descrizione: "ripara tutte le avarie in un colpo",
-        costo: 120,
+        costo_crediti: 3,
         effetto: Effetto::Riparazione,
     },
     FacilityDef {
         nome: "Trasporto coloni",
         descrizione: "+2 equipaggio subito, se ci sono posti",
-        costo: 150,
+        costo_crediti: 4,
         effetto: Effetto::Coloni,
     },
     FacilityDef {
         nome: "Ampliamento stiva",
         descrizione: "+2 al budget moduli del livello",
-        costo: 100,
+        costo_crediti: 3,
         effetto: Effetto::Stiva,
     },
     FacilityDef {
         nome: "Spurgo termico",
         descrizione: "azzera il surriscaldamento accumulato",
-        costo: 60,
+        costo_crediti: 2,
         effetto: Effetto::Spurgo,
     },
     FacilityDef {
         nome: "Sonda demolitrice",
         descrizione: "rimuove il detrito più vicino al centro",
-        costo: 200,
+        costo_crediti: 5,
         effetto: Effetto::Demolizione,
     },
 ];
 
-/// Le offerte della partita in corso. Si rinnova a ogni reset.
+/// Stato dell'overlay scorte: solo aperto/chiuso. L'inventario vero vive
+/// in `Portafoglio` (persistente), non qui.
 #[derive(Resource, Default)]
 pub struct Mercato {
     pub aperto: bool,
-    /// (indice in FACILITIES, già comprata)
-    pub offerte: Vec<(usize, bool)>,
 }
 
-impl Mercato {
-    /// Pesca 3 offerte valide per la nuova partita. Il seed è il rand di
-    /// sistema: le offerte sono la parte "random" voluta, non riproducibile.
-    pub fn rinnova(&mut self, con_budget: bool, con_detriti: bool) {
-        self.aperto = false;
-        let mut valide: Vec<usize> = (0..FACILITIES.len())
-            .filter(|&i| match FACILITIES[i].effetto {
-                Effetto::Stiva => con_budget,
-                Effetto::Demolizione => con_detriti,
-                _ => true,
-            })
-            .collect();
-        let mut rng = rand::rng();
-        self.offerte.clear();
-        for _ in 0..3.min(valide.len()) {
-            let scelta = rng.random_range(0..valide.len());
-            self.offerte.push((valide.swap_remove(scelta), false));
+/// Le scorte raggruppate: (indice di catalogo, quante ne hai), in ordine
+/// di catalogo. Indici fuori catalogo (file scritto a mano) si ignorano.
+pub fn conteggio_scorte(scorte: &[usize]) -> Vec<(usize, usize)> {
+    let mut conta = vec![0usize; FACILITIES.len()];
+    for &s in scorte {
+        if s < FACILITIES.len() {
+            conta[s] += 1;
         }
-        // ordine di catalogo, non di pesca: la lista a schermo è stabile
-        self.offerte.sort_by_key(|&(i, _)| i);
+    }
+    conta
+        .iter()
+        .enumerate()
+        .filter(|e| *e.1 > 0)
+        .map(|(i, &n)| (i, n))
+        .collect()
+}
+
+/// Perché una scorta NON è usabile in questa partita; `None` = usabile.
+fn non_applicabile(effetto: Effetto, station: &Station) -> Option<&'static str> {
+    match effetto {
+        Effetto::Stiva if station.max_moduli.is_none() => Some("qui non c'è un budget moduli"),
+        Effetto::Demolizione if station.ostacoli.is_empty() => Some("non ci sono detriti"),
+        _ => None,
     }
 }
 
 // ---------------- input ----------------
 
-/// `M` apre e chiude il mercato (solo in partita, mai sotto il menu Esc).
+/// `M` apre e chiude le scorte (solo in partita, mai sotto il menu Esc).
 pub fn toggle_tasto(
     tasti: Res<ButtonInput<KeyCode>>,
     pausa: Res<Pausa>,
@@ -120,7 +125,7 @@ pub fn toggle_tasto(
     }
 }
 
-/// Il bottone MERCATO nell'HUD (marker in ui.rs) fa lo stesso di `M`.
+/// Il bottone nell'HUD (marker in ui.rs) fa lo stesso di `M`.
 pub fn click_bottone(
     q: Query<&Interaction, (Changed<Interaction>, With<crate::ui::BottoneMercato>)>,
     pausa: Res<Pausa>,
@@ -138,7 +143,7 @@ pub fn click_bottone(
 #[derive(Component)]
 pub struct SchermataMercato;
 
-/// Una riga d'offerta comprabile; l'indice è la posizione in `offerte`.
+/// Una riga di scorta usabile; il valore è l'indice nel catalogo.
 #[derive(Component)]
 pub struct VoceMercato(pub usize);
 
@@ -153,19 +158,20 @@ fn testo(t: impl Into<String>, px: f32, colore: Color) -> impl Bundle {
     )
 }
 
-/// L'overlay esiste solo quando il mercato è aperto, in partita e senza il
-/// menu di pausa sopra; si ricostruisce quando cambia qualcosa (acquisti).
+/// L'overlay esiste solo quando le scorte sono aperte, in partita e senza
+/// il menu di pausa sopra; si ricostruisce quando l'inventario cambia.
 pub fn sincronizza(
     mut commands: Commands,
     stato: Res<State<AppState>>,
     pausa: Res<Pausa>,
     mercato: Res<Mercato>,
-    sim: Res<Sim>,
+    portafoglio: Res<Portafoglio>,
+    station: Res<Station>,
     q: Query<Entity, With<SchermataMercato>>,
 ) {
     let deve_esserci = mercato.aperto && *stato.get() == AppState::InGioco && !pausa.aperta;
     let c_e = !q.is_empty();
-    if deve_esserci == c_e && !(deve_esserci && (mercato.is_changed() || sim.is_changed())) {
+    if deve_esserci == c_e && !(deve_esserci && portafoglio.is_changed()) {
         return;
     }
     for e in &q {
@@ -174,6 +180,7 @@ pub fn sincronizza(
     if !deve_esserci {
         return;
     }
+    let scorte = conteggio_scorte(&portafoglio.scorte);
     commands
         .spawn((
             Node {
@@ -191,9 +198,9 @@ pub fn sincronizza(
             SchermataMercato,
         ))
         .with_children(|r| {
-            r.spawn(testo("MERCATO", 34.0, BIANCO));
+            r.spawn(testo("SCORTE", 34.0, BIANCO));
             r.spawn(testo(
-                "si paga in punti partita — niente soldi veri, mai",
+                "si comprano nel Marketplace, dal titolo — le medaglie fruttano crediti",
                 13.0,
                 GRIGIO_MEDIO,
             ));
@@ -203,19 +210,31 @@ pub fn sincronizza(
             },))
             .with_children(|c| {
                 c.spawn(testo(
-                    format!("hai {} punti", sim.punteggio),
+                    format!("hai {} crediti", portafoglio.crediti),
                     15.0,
                     GIALLO,
                 ));
             });
-            for (pos, &(idx, comprata)) in mercato.offerte.iter().enumerate() {
+            if scorte.is_empty() {
+                r.spawn(testo(
+                    "Nessuna scorta: compra nel Marketplace dal titolo",
+                    15.0,
+                    GRIGIO_MEDIO,
+                ));
+            }
+            for (idx, quante) in scorte {
                 let f = &FACILITIES[idx];
-                let riga = format!(
-                    "{}  —  {}  —  {} punti",
-                    f.nome, f.descrizione, f.costo
-                );
-                if comprata {
-                    r.spawn(testo(format!("{riga}  (comprata)"), 15.0, GRIGIO_SCAFO));
+                let riga = if quante > 1 {
+                    format!("{} ×{}  —  {}", f.nome, quante, f.descrizione)
+                } else {
+                    format!("{}  —  {}", f.nome, f.descrizione)
+                };
+                if let Some(motivo) = non_applicabile(f.effetto, &station) {
+                    r.spawn(testo(
+                        format!("{riga}  (qui non serve: {motivo})"),
+                        15.0,
+                        GRIGIO_SCAFO,
+                    ));
                 } else {
                     r.spawn((
                         Node {
@@ -224,24 +243,12 @@ pub fn sincronizza(
                             ..default()
                         },
                         BackgroundColor(SCAFO_SCURO),
-                        BorderColor::all(if sim.punteggio >= f.costo {
-                            CIANO
-                        } else {
-                            GRIGIO_SCAFO
-                        }),
+                        BorderColor::all(CIANO),
                         Button,
-                        VoceMercato(pos),
+                        VoceMercato(idx),
                     ))
                     .with_children(|c| {
-                        c.spawn(testo(
-                            riga,
-                            15.0,
-                            if sim.punteggio >= f.costo {
-                                METALLO
-                            } else {
-                                GRIGIO_SCAFO
-                            },
-                        ));
+                        c.spawn(testo(riga, 15.0, METALLO));
                     });
                 }
             }
@@ -253,13 +260,13 @@ pub fn sincronizza(
         });
 }
 
-// ---------------- acquisti ----------------
+// ---------------- uso delle scorte ----------------
 
 #[allow(clippy::too_many_arguments)]
-pub fn click_offerte(
+pub fn click_scorte(
     q: Query<(&Interaction, &VoceMercato), Changed<Interaction>>,
     mut commands: Commands,
-    mut mercato: ResMut<Mercato>,
+    mut portafoglio: ResMut<Portafoglio>,
     mut sim: ResMut<Sim>,
     mut station: ResMut<Station>,
     mut log: ResMut<EventLog>,
@@ -272,23 +279,17 @@ pub fn click_offerte(
         if *interazione != Interaction::Pressed {
             continue;
         }
-        let Some(&(idx, comprata)) = mercato.offerte.get(voce.0) else {
+        let Some(f) = FACILITIES.get(voce.0) else {
             continue;
         };
-        let f = &FACILITIES[idx];
-        if comprata {
+        // doppio controllo: l'overlay non mostra bottoni per le scorte non
+        // applicabili, ma tra spawn e click la griglia può essere cambiata
+        if non_applicabile(f.effetto, &station).is_some() {
             continue;
         }
-        if sim.punteggio < f.costo {
-            log.push(
-                sim.tick,
-                Gravita::Avviso,
-                format!("{}: servono {} punti", f.nome, f.costo),
-            );
+        if !portafoglio.usa(voce.0) {
             continue;
         }
-        sim.punteggio -= f.costo;
-        mercato.offerte[voce.0].1 = true;
         match f.effetto {
             Effetto::Ossigeno => {
                 sim.ossigeno = O2_MAX;
@@ -328,7 +329,7 @@ pub fn click_offerte(
                 }
             }
         }
-        log.info(sim.tick, format!("Mercato: {} ({} punti)", f.nome, f.costo));
+        log.info(sim.tick, format!("Scorte: {} usata", f.nome));
         crate::audio::suona(&mut commands, &suoni.acquisto, imp.effetti_lineare());
     }
 }
@@ -340,31 +341,15 @@ mod test {
     use super::*;
 
     #[test]
-    fn le_offerte_rispettano_i_requisiti_del_livello() {
-        // senza budget e senza detriti, stiva e demolizione non compaiono mai
-        for _ in 0..50 {
-            let mut m = Mercato::default();
-            m.rinnova(false, false);
-            assert!(m.offerte.len() <= 3);
-            for &(i, comprata) in &m.offerte {
-                assert!(!comprata);
-                assert!(!matches!(
-                    FACILITIES[i].effetto,
-                    Effetto::Stiva | Effetto::Demolizione
-                ));
-            }
-        }
+    fn il_conteggio_raggruppa_e_ordina_per_catalogo() {
+        let scorte = vec![4, 0, 4, 5];
+        assert_eq!(conteggio_scorte(&scorte), vec![(0, 1), (4, 2), (5, 1)]);
+        assert!(conteggio_scorte(&[]).is_empty());
     }
 
     #[test]
-    fn con_tutto_disponibile_si_pescano_sempre_tre_offerte_distinte() {
-        for _ in 0..50 {
-            let mut m = Mercato::default();
-            m.rinnova(true, true);
-            assert_eq!(m.offerte.len(), 3);
-            let mut idx: Vec<usize> = m.offerte.iter().map(|&(i, _)| i).collect();
-            idx.dedup();
-            assert_eq!(idx.len(), 3, "offerte duplicate");
-        }
+    fn gli_indici_fuori_catalogo_non_rompono_il_conteggio() {
+        // un progressi.txt scritto a mano non deve far crashare l'overlay
+        assert_eq!(conteggio_scorte(&[99, 2]), vec![(2, 1)]);
     }
 }

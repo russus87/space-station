@@ -87,6 +87,12 @@ pub struct Progressione {
 #[derive(Resource, Default)]
 pub struct UltimoPiazzamento(pub Option<usize>);
 
+/// Esito medaglia dell'ultimo livello completato: (medaglia, crediti
+/// guadagnati ORA — zero se la medaglia non è migliorata). La legge la
+/// schermata "livello completato".
+#[derive(Resource, Default)]
+pub struct UltimaMedaglia(pub Option<(crate::progressi::Medaglia, u32)>);
+
 // ---------------- livelli ----------------
 
 /// Un obiettivo misurabile. I numeri stanno nella tabella `LIVELLI`.
@@ -297,12 +303,15 @@ impl Obiettivo {
 
 /// Valuta l'obiettivo del livello in corso, una volta per tick effettivo.
 /// Gira solo con un obiettivo attivo (`obiettivi_attivi`) e in `InGioco`.
+#[allow(clippy::too_many_arguments)]
 pub fn controlla_obiettivo(
     modalita: Res<Modalita>,
     casuale: Res<LivelloCasuale>,
     sim: Res<Sim>,
     mut stato: ResMut<StatoLivello>,
     mut progressione: ResMut<Progressione>,
+    mut portafoglio: ResMut<crate::progressi::Portafoglio>,
+    mut medaglia: ResMut<UltimaMedaglia>,
     moduli: Query<&Module>,
     mut log: ResMut<EventLog>,
     mut prossimo: ResMut<NextState<AppState>>,
@@ -331,12 +340,22 @@ pub fn controlla_obiettivo(
             sim.tick,
             format!("Obiettivo raggiunto: {}", obiettivo.descrizione()),
         );
-        // la progressione avanza solo in campagna: il casuale è fuori gara
-        if let Modalita::Campagna(i) = *modalita
-            && i + 1 > progressione.completati
-        {
-            progressione.completati = i + 1;
-            salva_progressione(progressione.completati);
+        // progressione e medaglie solo in campagna: il casuale è fuori gara
+        medaglia.0 = None;
+        if let Modalita::Campagna(i) = *modalita {
+            if i + 1 > progressione.completati {
+                progressione.completati = i + 1;
+                salva_progressione(progressione.completati);
+            }
+            let tetto = sim.tetto_tick.unwrap_or(crate::sim::TICK_MASSIMO);
+            let (presa, crediti) = portafoglio.registra_livello(i, sim.tick, tetto);
+            if crediti > 0 {
+                log.info(
+                    sim.tick,
+                    format!("Medaglia: +{crediti} crediti per il Marketplace"),
+                );
+            }
+            medaglia.0 = Some((presa, crediti));
         }
         prossimo.set(AppState::LivelloCompletato);
     }

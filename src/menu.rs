@@ -9,6 +9,8 @@ use crate::livelli::{
     ClassificaInfinita, ClassificaSfida, LIVELLI, LivelloCasuale, LivelloScelto, Modalita,
     Progressione, Record, UltimoPiazzamento, giorni_fa,
 };
+use crate::mercato::FACILITIES;
+use crate::progressi::Portafoglio;
 use rand::RngExt;
 use crate::modules::{KINDS, TABELLA};
 use crate::personaggi::{PERSONAGGI, annuncio_sblocco, battuta_briefing};
@@ -34,6 +36,9 @@ pub enum AppState {
     Intermezzo,
     /// Top 10 delle partite in modalità infinita.
     SchermataClassifica,
+    /// Catalogo delle facilities: si compra coi crediti delle medaglie,
+    /// mai con valuta reale. Le scorte comprate si usano in partita (M).
+    Marketplace,
     InGioco,
     /// Obiettivo del livello raggiunto: punteggio, tick e avanzamento.
     LivelloCompletato,
@@ -84,6 +89,9 @@ pub enum Azione {
     /// Genera un livello con seed casuale e lo gioca (fuori progressione).
     GiocaCasuale,
     ApriClassifica,
+    ApriMarketplace,
+    /// Compra la facility `i` del catalogo, se i crediti bastano.
+    CompraFacility(usize),
     /// Dalla selezione livello al briefing del livello i (0-based).
     ScegliLivello(usize),
     /// Dall'intermezzo al briefing del livello già scelto.
@@ -145,9 +153,22 @@ fn testo(t: impl Into<String>, px: f32, colore: Color) -> impl Bundle {
     )
 }
 
+/// Colore "di riposo" di una voce che non deve essere il METALLO standard:
+/// `evidenzia_voci` lo rispetta quando la voce non è selezionata. Usato
+/// per i numeri di livello colorati dalla medaglia.
+#[derive(Component)]
+pub struct ColoreFisso(pub Color);
+
 /// Variante compatta di `voce` per la griglia dei livelli: una cella
 /// quadrata col numero, stessi componenti e stessi sistemi di navigazione.
-fn voce_cella(p: &mut ChildSpawnerCommands, idx: usize, azione: Azione, etichetta: String) {
+/// `colore` è il colore della medaglia (None = nessuna medaglia).
+fn voce_cella(
+    p: &mut ChildSpawnerCommands,
+    idx: usize,
+    azione: Azione,
+    etichetta: String,
+    colore: Option<Color>,
+) {
     p.spawn((
         Node {
             width: Val::Px(46.0),
@@ -166,7 +187,11 @@ fn voce_cella(p: &mut ChildSpawnerCommands, idx: usize, azione: Azione, etichett
         },
     ))
     .with_children(|c| {
-        c.spawn(testo(etichetta, 16.0, METALLO));
+        let base = colore.unwrap_or(METALLO);
+        let mut cella = c.spawn(testo(etichetta, 16.0, base));
+        if let Some(colore) = colore {
+            cella.insert(ColoreFisso(colore));
+        }
     });
 }
 
@@ -259,7 +284,7 @@ fn radice_centrata() -> Node {
 pub fn entra_titolo(mut commands: Commands, mut sel: ResMut<Selezione>) {
     *sel = Selezione {
         idx: 0,
-        n: 7,
+        n: 8,
         conferma: None,
     };
     commands
@@ -288,9 +313,10 @@ pub fn entra_titolo(mut commands: Commands, mut sel: ResMut<Selezione>) {
             voce(r, 1, Azione::GiocaInfinita, "Infinita");
             voce(r, 2, Azione::GiocaSfida, "Sfida");
             voce(r, 3, Azione::GiocaCasuale, "Livello casuale");
-            voce(r, 4, Azione::ApriClassifica, "Classifica");
-            voce(r, 5, Azione::ComeSiGioca, "Come si gioca");
-            voce(r, 6, Azione::Esci, "Esci");
+            voce(r, 4, Azione::ApriMarketplace, "Marketplace");
+            voce(r, 5, Azione::ApriClassifica, "Classifica");
+            voce(r, 6, Azione::ComeSiGioca, "Come si gioca");
+            voce(r, 7, Azione::Esci, "Esci");
         });
 }
 
@@ -463,6 +489,7 @@ pub struct SchermataSelezione;
 pub fn entra_selezione(
     mut commands: Commands,
     progressione: Res<Progressione>,
+    portafoglio: Res<Portafoglio>,
     mut sel: ResMut<Selezione>,
 ) {
     let sbloccati = (progressione.completati + 1).min(LIVELLI.len());
@@ -488,7 +515,7 @@ pub fn entra_selezione(
             .with_children(|c| {
                 c.spawn(testo(
                     format!(
-                        "50 livelli in ordine — completati {} · frecce per muoverti, Invio per il briefing",
+                        "50 livelli in ordine — completati {} · il colore è la medaglia (oro, argento, rame) · frecce e Invio",
                         progressione.completati
                     ),
                     13.0,
@@ -514,7 +541,13 @@ pub fn entra_selezione(
                         } else {
                             format!("{}", i + 1)
                         };
-                        voce_cella(griglia, i, Azione::ScegliLivello(i), etichetta);
+                        let colore = match portafoglio.medaglia(i) {
+                            crate::progressi::ORO => Some(GIALLO),
+                            crate::progressi::ARGENTO => Some(BIANCO),
+                            crate::progressi::RAME => Some(crate::ui::RUGGINE),
+                            _ => None,
+                        };
+                        voce_cella(griglia, i, Azione::ScegliLivello(i), etichetta, colore);
                     } else {
                         griglia
                             .spawn((Node {
@@ -768,6 +801,91 @@ pub fn esci_classifica(mut commands: Commands, q: Query<Entity, With<SchermataCl
     }
 }
 
+// ---------------- Marketplace ----------------
+
+#[derive(Component)]
+pub struct SchermataMarketplace;
+
+/// Il testo del saldo crediti nella schermata Marketplace: aggiornato da
+/// `aggiorna_voci_marketplace` dopo ogni acquisto.
+#[derive(Component)]
+pub struct SaldoCrediti;
+
+/// L'etichetta di catalogo della facility `i`: nome, effetto, costo,
+/// quante se ne possiedono e l'eventuale nota sui crediti che non bastano
+/// (le voci restano cliccabili ma `compra` rifiuta: niente sorprese).
+fn etichetta_facility(i: usize, portafoglio: &Portafoglio) -> String {
+    let f = &FACILITIES[i];
+    let possedute = portafoglio.scorte.iter().filter(|&&s| s == i).count();
+    let mut riga = format!("{} — {} — {} crediti", f.nome, f.descrizione, f.costo_crediti);
+    if possedute > 0 {
+        riga.push_str(&format!("  · ne hai {possedute}"));
+    }
+    if portafoglio.crediti < f.costo_crediti {
+        riga.push_str("  · crediti insufficienti");
+    }
+    riga
+}
+
+/// Catalogo delle facilities: si compra coi crediti delle medaglie
+/// (oro 3, argento 2, rame 1 — e solo la differenza quando si migliora),
+/// mai con soldi veri. Le scorte comprate si usano in partita col tasto M.
+pub fn entra_marketplace(
+    mut commands: Commands,
+    portafoglio: Res<Portafoglio>,
+    mut sel: ResMut<Selezione>,
+) {
+    *sel = Selezione {
+        idx: 0,
+        n: FACILITIES.len() + 1, // catalogo + Indietro
+        conferma: None,
+    };
+    commands
+        .spawn((
+            radice_centrata(),
+            BackgroundColor(NERO),
+            GlobalZIndex(10),
+            SchermataMarketplace,
+        ))
+        .with_children(|r| {
+            r.spawn(testo("MARKETPLACE", 34.0, BIANCO));
+            r.spawn(testo(
+                "si compra coi crediti delle medaglie — mai con soldi veri",
+                13.0,
+                GRIGIO_MEDIO,
+            ));
+            r.spawn((Node {
+                margin: UiRect::bottom(Val::Px(14.0)),
+                ..default()
+            },))
+            .with_children(|c| {
+                c.spawn((
+                    testo(format!("hai {} crediti", portafoglio.crediti), 15.0, GIALLO),
+                    SaldoCrediti,
+                ));
+            });
+            for i in 0..FACILITIES.len() {
+                voce(
+                    r,
+                    i,
+                    Azione::CompraFacility(i),
+                    etichetta_facility(i, &portafoglio),
+                );
+            }
+            r.spawn(Node {
+                height: Val::Px(14.0),
+                ..default()
+            });
+            voce(r, FACILITIES.len(), Azione::IndietroTitolo, "Indietro");
+        });
+}
+
+pub fn esci_marketplace(mut commands: Commands, q: Query<Entity, With<SchermataMarketplace>>) {
+    for e in &q {
+        commands.entity(e).despawn();
+    }
+}
+
 // ---------------- Livello completato ----------------
 
 #[derive(Component)]
@@ -782,6 +900,7 @@ pub fn entra_completato(
     modalita: Res<Modalita>,
     casuale: Res<LivelloCasuale>,
     art: Res<Art>,
+    medaglia: Res<crate::livelli::UltimaMedaglia>,
     mut sel: ResMut<Selezione>,
 ) {
     let in_casuale = matches!(*modalita, Modalita::Casuale);
@@ -826,11 +945,30 @@ pub fn entra_completato(
             });
             r.spawn(testo(format!("Punteggio: {}", sim.punteggio), 22.0, BIANCO));
             r.spawn((Node {
-                margin: UiRect::bottom(Val::Px(18.0)),
+                margin: UiRect::bottom(Val::Px(6.0)),
                 ..default()
             },))
             .with_children(|c| {
                 c.spawn(testo(format!("Tick: {}", sim.tick), 14.0, METALLO));
+            });
+            r.spawn((Node {
+                margin: UiRect::bottom(Val::Px(18.0)),
+                ..default()
+            },))
+            .with_children(|c| {
+                if let Some((presa, crediti)) = medaglia.0 {
+                    let (nome, colore) = match presa {
+                        crate::progressi::ORO => ("MEDAGLIA D'ORO", GIALLO),
+                        crate::progressi::ARGENTO => ("MEDAGLIA D'ARGENTO", BIANCO),
+                        _ => ("MEDAGLIA DI RAME", crate::ui::RUGGINE),
+                    };
+                    let riga = if crediti > 0 {
+                        format!("{nome}  ·  +{crediti} crediti per il Marketplace")
+                    } else {
+                        nome.to_string()
+                    };
+                    c.spawn(testo(riga, 16.0, colore));
+                }
             });
             // ai traguardi della campagna il personaggio di turno presenta
             // il modulo appena sbloccato (comparirà nella palette)
@@ -1051,6 +1189,7 @@ pub fn naviga(
     mut casuale: ResMut<LivelloCasuale>,
     progressione: Res<Progressione>,
     mut imp: ResMut<Impostazioni>,
+    mut portafoglio: ResMut<Portafoglio>,
     stato: Res<State<AppState>>,
     mut prossimo: ResMut<NextState<AppState>>,
     mut esci: MessageWriter<AppExit>,
@@ -1076,7 +1215,9 @@ pub fn naviga(
                 prossimo.set(origine.stato);
                 pausa.aperta = origine.da_pausa;
             }
-            AppState::SelezioneLivello | AppState::SchermataClassifica => {
+            AppState::SelezioneLivello
+            | AppState::SchermataClassifica
+            | AppState::Marketplace => {
                 prossimo.set(AppState::Titolo);
             }
             AppState::Briefing | AppState::Intermezzo => {
@@ -1130,6 +1271,7 @@ pub fn naviga(
                 &mut casuale,
                 &progressione,
                 &mut imp,
+                &mut portafoglio,
                 attuale,
                 &mut prossimo,
                 &mut esci,
@@ -1150,6 +1292,7 @@ pub fn click_voci(
     mut casuale: ResMut<LivelloCasuale>,
     progressione: Res<Progressione>,
     mut imp: ResMut<Impostazioni>,
+    mut portafoglio: ResMut<Portafoglio>,
     stato: Res<State<AppState>>,
     mut prossimo: ResMut<NextState<AppState>>,
     mut esci: MessageWriter<AppExit>,
@@ -1177,6 +1320,7 @@ pub fn click_voci(
                     &mut casuale,
                     &progressione,
                     &mut imp,
+                    &mut portafoglio,
                     attuale,
                     &mut prossimo,
                     &mut esci,
@@ -1200,6 +1344,7 @@ fn esegui(
     casuale: &mut LivelloCasuale,
     progressione: &Progressione,
     imp: &mut Impostazioni,
+    portafoglio: &mut Portafoglio,
     attuale: AppState,
     prossimo: &mut NextState<AppState>,
     esci: &mut MessageWriter<AppExit>,
@@ -1235,6 +1380,12 @@ fn esegui(
             prossimo.set(AppState::InGioco);
         }
         Azione::ApriClassifica => prossimo.set(AppState::SchermataClassifica),
+        Azione::ApriMarketplace => prossimo.set(AppState::Marketplace),
+        Azione::CompraFacility(i) => {
+            // se i crediti non bastano `compra` rifiuta e non succede nulla:
+            // l'etichetta lo dice già ("crediti insufficienti")
+            portafoglio.compra(i, FACILITIES[i].costo_crediti);
+        }
         Azione::ScegliLivello(i) => {
             scelto.0 = i;
             // la storia si mostra solo la prima volta che si arriva al
@@ -1319,10 +1470,32 @@ pub fn aggiorna_voci_volume(imp: Res<Impostazioni>, mut voci: Query<&mut Voce>) 
     }
 }
 
+/// Dopo un acquisto nel Marketplace aggiorna saldo ed etichette del
+/// catalogo: stessa tecnica di `aggiorna_voci_volume` (si scrive
+/// `Voce.etichetta`, che `evidenzia_voci` ricopia sul testo a ogni frame);
+/// il saldo non è una voce e si scrive direttamente.
+pub fn aggiorna_voci_marketplace(
+    portafoglio: Res<Portafoglio>,
+    mut voci: Query<&mut Voce>,
+    mut saldi: Query<&mut Text, With<SaldoCrediti>>,
+) {
+    if !portafoglio.is_changed() {
+        return;
+    }
+    for mut v in &mut voci {
+        if let Azione::CompraFacility(i) = v.azione {
+            v.etichetta = etichetta_facility(i, &portafoglio);
+        }
+    }
+    for mut t in &mut saldi {
+        t.0 = format!("hai {} crediti", portafoglio.crediti);
+    }
+}
+
 pub fn evidenzia_voci(
     sel: Res<Selezione>,
     mut voci: Query<(&Voce, &Children, &mut BackgroundColor, &mut BorderColor)>,
-    mut testi: Query<(&mut Text, &mut TextColor)>,
+    mut testi: Query<(&mut Text, &mut TextColor, Option<&ColoreFisso>)>,
 ) {
     for (v, figli, mut bg, mut bordo) in &mut voci {
         let scelta = v.idx == sel.idx;
@@ -1336,13 +1509,18 @@ pub fn evidenzia_voci(
             Color::NONE
         });
         for figlio in figli.iter() {
-            if let Ok((mut t, mut c)) = testi.get_mut(figlio) {
+            if let Ok((mut t, mut c, fisso)) = testi.get_mut(figlio) {
                 if in_conferma {
                     t.0 = "Sicuro? La stazione andrà persa — Invio conferma, Esc annulla".into();
                     c.0 = ROSSO;
                 } else {
                     t.0 = v.etichetta.clone();
-                    c.0 = if scelta { BIANCO } else { METALLO };
+                    // le medaglie tengono il loro colore anche a riposo
+                    c.0 = if scelta {
+                        BIANCO
+                    } else {
+                        fisso.map(|f| f.0).unwrap_or(METALLO)
+                    };
                 }
             }
         }
