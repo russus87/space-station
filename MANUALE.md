@@ -1,11 +1,11 @@
 # SPACE STATION — Manuale di gioco
 
-*Manuale operativo di bordo, edizione v0.3 — da leggere prima del primo
+*Manuale operativo di bordo, edizione v0.4 — da leggere prima del primo
 turno in cabina di comando. O durante. Nessuno ti giudica.*
 
 ---
 
-Benvenuto a bordo, Direttore.
+Benvenuto a bordo, progettista.
 
 Space Station è un gioco di equilibri: costruisci una stazione spaziale su
 una griglia, moduli attaccati ad altri moduli, e poi premi Spazio e guardi
@@ -110,50 +110,106 @@ risorsa più preziosa di tutte. Il log ti avvisa quando ci sono:
 
 ---
 
-## 3. L'equipaggio della stazione
+## 3. La storia e l'equipaggio
 
-Cinque persone ti accompagnano lungo la campagna. Compaiono nei briefing
-con le loro battute, e a ogni traguardo uno di loro ti consegna un modulo
-nuovo. Ascoltali: dicono sempre qualcosa sul livello che stai per
-giocare.
+### La storia
+
+Nel settore K, dove costruisci, orbita da dieci anni quel che resta di
+un'altra stazione. L'equipaggio la chiama "la Vecchia", con l'affetto
+storto che si riserva ai morti di famiglia — e quelle rocce su cui
+serpeggi coi corridoi non sono soltanto sassi. Il gioco lo racconta per
+gradi: ai livelli **1, 11, 21, 31 e 41** compare un **diario di bordo**
+(la prima volta che ci arrivi), una pagina a testa per chi ha qualcosa da
+dire; le battute dei briefing fanno il resto, una scheggia per volta,
+fino a un finale che chiude i conti di tutti. Chi vuole la mappa completa
+degli archi la trova in `STORIA.md` — ma è più bello scoprirla giocando.
+
+### L'equipaggio
+
+Cinque persone ti accompagnano per tutta la campagna: nei briefing di
+**ogni** livello parla uno di loro, e a ogni traguardo uno ti consegna un
+modulo nuovo. Sono tutti, per motivi propri, legati alla Vecchia.
+Ascoltali: sotto la battuta c'è sempre un'istruzione — e sotto
+l'istruzione, quasi sempre, un ricordo.
 
 ### <img src="docs/img/ingegnere.png" width="96"><br>Vera — Ingegnera di bordo
 
-La incontri subito, al livello 2, a spiegarti che la corrente non salta
-il vuoto. È lei che ti consegna la **Batteria** (livello 5: «mangia il
-surplus e lo ridà quando la rete annaspa. Non è un reattore, è tempo
-comprato») e il **Condotto termico** (livello 35: «dissipa quanto due
-radiatori in una cella sola. Beve corrente, ma il calore non perdona»).
-Se parla di calore, prendi appunti.
+**Passato.** Dieci anni fa era di turno in una sala macchine di cui non
+parla mai direttamente — e di cui parla sempre, se fai caso a come
+tratta il calore. Nessuno le ha mai dato una colpa; lei non ha mai
+accettato l'assoluzione.
+**Carattere.** Sarcasmo da officina, tenerezza per le macchine ("riparala,
+e chiedile scusa da parte mia"). Ride dei propri progetti, dell'orgoglio
+degli ingegneri e della burocrazia del centro; non ride mai del calore.
+**Nella campagna.** Padrona di casa dei blocchi dei reattori (6–10) e
+delle stazioni dense (31–35); ti consegna la **Batteria** al livello 5 —
+per lei è "tempo comprato" — e il **Condotto termico** al 35, il suo
+progetto riabilitativo.
+
+> «Qui dentro fa caldo come in sala macchine, quella notte. Lo dico da
+> sola, piano: non finirà allo stesso modo.»
 
 ### <img src="docs/img/medico.png" width="96"><br>Tomas — Medico di stazione
 
-Compare quando l'aria si fa questione seria (livelli 15 e 20). Ti
-consegna la **Serra** (livello 15: «chiede meno corrente del life support
-e fa un po' d'aria quasi gratis. Ma scalda, occhio»). Il suo mantra:
-*«Gli incidenti capitano. Quello che conta è chi respira dopo.»*
+**Passato.** Ha tenuto un registro, una volta, in cui i conti non
+tornavano più: da allora conta tutto — respiri, letti, arrivi — come se
+contare fosse una forma di preghiera.
+**Carattere.** Fatalista gentile, umorismo da obitorio e mani da
+pediatra. Ride delle diagnosi noiose e delle pagine bianche del suo
+registro; non ride mai dei nomi.
+**Nella campagna.** Padrone di casa dei blocchi dell'aria e degli
+incidenti (11–20), la coscienza sanitaria di ogni ondata di coloni; ti
+consegna la **Serra** al livello 15 — la chiama "prescrizione verde".
+
+> «Gli incidenti capitano. Quello che conta è chi respira dopo.»
 
 ### <img src="docs/img/caposquadra.png" width="96"><br>Dario — Caposquadra
 
-La voce del cantiere: primo livello generato (7), campi pieni di rocce
-(25), cuccette che non bastano (30). Ti consegna la **Gru** (livello 25:
-«mettila accanto a una roccia e lasciala lavorare. Quando ha finito
-sparisce, roccia compresa»).
+**Passato.** Sei anni di turni su una stazione che oggi non c'è più:
+conosce quelle rocce là fuori molto meglio di quanto ammetta, e per
+mezza campagna preferisce costruirci intorno piuttosto che guardarle.
+**Carattere.** Misura tutto, borbotta sempre, vuole bene alla squadra in
+modo ruvido e totale. Ride delle lamentele in mensa e dei propri
+borbottii; non ride mai delle scelte che ha dovuto fare altrove.
+**Nella campagna.** La voce del cantiere: apre il livello 1, guida i
+blocchi dei detriti e della crescita (21–30); ti consegna la **Gru** al
+livello 25 — il giorno in cui smette di girare attorno alle macerie,
+letteralmente e no.
+
+> «Non farmi scegliere chi dorme in corridoio. L'ho già fatto una volta,
+> su un'altra stazione. Non lo rifaccio.»
 
 ### <img src="docs/img/scienziata.png" width="96"><br>Mira — Scienziata capo
 
-Arriva tardi (livello 40) e va dritta al punto: *«I laboratori sono il
-motivo per cui siamo qui. Tienimeli accesi e i punti si contano da
-soli.»* Quando c'è lei nel briefing, l'obiettivo passa dai laboratori.
+**Passato.** Ufficialmente è a bordo per i laboratori. In realtà
+cataloga i frammenti là fuori con un'attenzione che alle rocce non
+servirebbe — e per metà campagna tiene per sé quello che va scoprendo.
+**Carattere.** Precisa, riservata, di un'onestà che non fa sconti
+nemmeno a se stessa. Ride (poco) della retorica del centro; non ride mai
+dei numeri, perché sa cosa costano.
+**Nella campagna.** Padrona di casa del blocco dei laboratori (36–40);
+non consegna moduli: consegna qualcosa che vale di più, a metà campagna,
+e cambia il modo in cui guarderai il punteggio.
+
+> «Ogni punto in archivio è un'ora della vita di qualcuno. Spendili come
+> se costassero. Costano.»
 
 ### <img src="docs/img/comandante.png" width="96"><br>Ilse — Comandante
 
-Apre la campagna («Stazione nuova, equipaggio in arrivo. Tienili vivi»),
-chiude il rodaggio al livello 5, e torna per il finale (45 e 50). Ti
-consegna il **Centro comando** (livello 45: «la gente arriva al doppio
-della velocità. Uno solo per stazione — il comando non si divide»).
-L'ultima battuta della campagna è sua: *«Tutto quello che sai, tutto
-insieme. Portaci a casa.»*
+**Passato.** C'è chi la chiama ancora "quella che ha perso una
+stazione". Lei non corregge nessuno: sa contare meglio di tutti quello
+che invece ha salvato.
+**Carattere.** Voce del comando: asciutta, mai un aggettivo di troppo,
+gli ordini che sembrano preghiere e viceversa. Ride quasi solo per
+iscritto, nel diario; non ride mai della parola "evacuazione".
+**Nella campagna.** Apre e chiude tutto: il primo diario di bordo è suo,
+l'ultimo pure. Guida i blocchi finali (41–50) e ti consegna il **Centro
+comando** al 45. L'ultima battuta della campagna, prima del finale, è
+sua: *«Ultimo settore. Tutto quello che sai, tutto insieme. Portaci a
+casa.»*
+
+> «Da oggi vietata la parola 'avamposto'. Si chiama casa. E le case non
+> si evacuano: si difendono.»
 
 ---
 
@@ -228,7 +284,22 @@ gioco, tutto è gratis nel mondo vero.*
 
 ---
 
-## 7. Consigli di sopravvivenza
+## 7. L'audio
+
+Ogni suono della stazione è generato da uno script (`tools/gen_audio.py`),
+come gli sprite: onde quadre e triangolari, niente registrazioni. La
+grammatica è semplice e vale ovunque: **il verso del suono racconta
+l'evento** — sale per le cose che crescono (costruzioni, nuovi arrivi),
+scende per quelle che finiscono (rimozioni, sconfitte). Gli allarmi
+suonano i **passaggi** di stato, mai gli stati: se senti l'allarme una
+volta, qualcosa è appena peggiorato; se non lo senti più, non è detto che
+vada tutto bene — è detto solo che non sta peggiorando. Il registro
+eventi resta l'unica fonte completa: l'audio ti gira la testa verso lo
+schermo, il log ti dice cosa guardare.
+
+---
+
+## 8. Consigli di sopravvivenza
 
 1. **Un radiatore prima del secondo reattore.** Due reattori sono +80 di
    calore: il surriscaldamento perdona 6 tick, poi rompe qualcosa a caso

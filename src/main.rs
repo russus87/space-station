@@ -4,6 +4,7 @@
 //! cablaggio degli stati dell'app. La UI di gioco sta in `ui.rs`, le
 //! schermate di menu in `menu.rs`.
 
+mod audio;
 mod generatore;
 mod livelli;
 mod menu;
@@ -233,7 +234,12 @@ fn main() {
         .insert_resource(livelli::carica_progressione())
         .insert_resource(Sim::default())
         .insert_resource(EventLog::default())
-        .add_systems(Startup, (font_principale, carica_art, (setup, ui::setup_ui)).chain())
+        .add_systems(
+            Startup,
+            (font_principale, carica_art, audio::carica_suoni, (setup, ui::setup_ui)).chain(),
+        )
+        .add_systems(OnEnter(AppState::LivelloCompletato), audio::suona_completato)
+        .add_systems(OnEnter(AppState::FinePartita), audio::suona_sconfitta)
         .add_systems(OnEnter(AppState::Titolo), menu::entra_titolo)
         .add_systems(OnExit(AppState::Titolo), menu::esci_titolo)
         .add_systems(OnEnter(AppState::ComeSiGioca), menu::entra_guida)
@@ -242,6 +248,8 @@ fn main() {
         .add_systems(OnExit(AppState::SelezioneLivello), menu::esci_selezione)
         .add_systems(OnEnter(AppState::Briefing), menu::entra_briefing)
         .add_systems(OnExit(AppState::Briefing), menu::esci_briefing)
+        .add_systems(OnEnter(AppState::Intermezzo), menu::entra_intermezzo)
+        .add_systems(OnExit(AppState::Intermezzo), menu::esci_intermezzo)
         .add_systems(OnEnter(AppState::SchermataClassifica), menu::entra_classifica)
         .add_systems(OnExit(AppState::SchermataClassifica), menu::esci_classifica)
         .add_systems(OnEnter(AppState::LivelloCompletato), menu::entra_completato)
@@ -289,6 +297,11 @@ fn main() {
                 aggiorna_visuali,
                 orienta_corridoi,
                 mercato::sincronizza,
+                audio::suona_log,
+                audio::suona_arrivi,
+                audio::suona_click,
+                screenshot_tasto,
+                demo_foto,
                 visibilita_scena,
                 ui::visibilita_gioco,
                 ui::update_hud,
@@ -521,12 +534,89 @@ fn input_tastiera(
     }
 }
 
+/// Piazza fisicamente un modulo sulla cella: sprite, figli (overlay, badge,
+/// numero), registrazione in `Station`. Nessuna validazione: i chiamanti
+/// (click del giocatore, servizio fotografico) controllano prima.
+fn costruisci_modulo(
+    commands: &mut Commands,
+    station: &mut Station,
+    art: &Art,
+    griglia: &Griglia,
+    kind: ModuleKind,
+    cella: IVec2,
+) -> String {
+    let def = kind.def();
+    station.contatori[kind.index()] += 1;
+    station.seq += 1;
+    let numero = station.contatori[kind.index()];
+    let etichetta = format!("{} {}", def.nome, numero);
+    let pos = griglia.cella_in_mondo(cella);
+    let lato = griglia.cella;
+    let e = commands
+        .spawn((
+            Sprite {
+                image: art.moduli[kind.index()].clone(),
+                custom_size: Some(Vec2::splat(lato)),
+                ..default()
+            },
+            Transform::from_xyz(pos.x, pos.y, 1.0),
+            Module {
+                kind,
+                etichetta: etichetta.clone(),
+                cella,
+                seq: station.seq,
+                powered: true,
+                broken: false,
+                staffed: true,
+                collegato: true, // il primo tick (anche in anteprima) lo ricalcola
+                carica: 0.0,
+                lavoro: 0,
+            },
+            Scena,
+        ))
+        .with_children(|p| {
+            // velo scuro sopra lo sprite quando il modulo è fermo
+            p.spawn((
+                Sprite::from_color(Color::NONE, Vec2::splat(ART)),
+                Transform::from_xyz(0.0, 0.0, 0.1).with_scale(Vec3::splat(1.0)),
+                Visibility::Hidden,
+                Overlay,
+            ));
+            // badge del motivo: fulmine / omino / triangolo
+            p.spawn((
+                Sprite {
+                    image: Handle::default(),
+                    custom_size: Some(Vec2::splat(ART * 0.3)),
+                    ..default()
+                },
+                Transform::from_xyz(0.0, 0.0, 0.2),
+                Visibility::Hidden,
+                Badge,
+            ));
+            p.spawn((
+                Text2d::new(numero.to_string()),
+                TextFont {
+                    font_size: FontSize::Px(11.0),
+                    ..default()
+                },
+                TextColor(ui::BIANCO),
+                Anchor::BOTTOM_RIGHT,
+                Transform::from_xyz(0.0, 0.0, 0.3),
+                Numero,
+            ));
+        })
+        .id();
+    station.celle.insert(cella, e);
+    etichetta
+}
+
 fn input_mouse(
     mouse: Res<ButtonInput<MouseButton>>,
     finestre: Query<&Window, With<PrimaryWindow>>,
     camere: Query<(&Camera, &GlobalTransform)>,
     griglia: Res<Griglia>,
     art: Res<Art>,
+    suoni: Res<audio::Suoni>,
     pausa: Res<Pausa>,
     mut station: ResMut<Station>,
     sel: Res<Selected>,
@@ -580,68 +670,9 @@ fn input_mouse(
             );
             return;
         }
-        station.contatori[kind.index()] += 1;
-        station.seq += 1;
-        let numero = station.contatori[kind.index()];
-        let etichetta = format!("{} {}", def.nome, numero);
-        let pos = griglia.cella_in_mondo(cella);
-        let lato = griglia.cella;
-        let e = commands
-            .spawn((
-                Sprite {
-                    image: art.moduli[kind.index()].clone(),
-                    custom_size: Some(Vec2::splat(lato)),
-                    ..default()
-                },
-                Transform::from_xyz(pos.x, pos.y, 1.0),
-                Module {
-                    kind,
-                    etichetta: etichetta.clone(),
-                    cella,
-                    seq: station.seq,
-                    powered: true,
-                    broken: false,
-                    staffed: true,
-                    collegato: true, // il primo tick (anche in anteprima) lo ricalcola
-                    carica: 0.0,
-                    lavoro: 0,
-                },
-                Scena,
-            ))
-            .with_children(|p| {
-                // velo scuro sopra lo sprite quando il modulo è fermo
-                p.spawn((
-                    Sprite::from_color(Color::NONE, Vec2::splat(ART)),
-                    Transform::from_xyz(0.0, 0.0, 0.1).with_scale(Vec3::splat(1.0)),
-                    Visibility::Hidden,
-                    Overlay,
-                ));
-                // badge del motivo: fulmine / omino / triangolo
-                p.spawn((
-                    Sprite {
-                        image: Handle::default(),
-                        custom_size: Some(Vec2::splat(ART * 0.3)),
-                        ..default()
-                    },
-                    Transform::from_xyz(0.0, 0.0, 0.2),
-                    Visibility::Hidden,
-                    Badge,
-                ));
-                p.spawn((
-                    Text2d::new(numero.to_string()),
-                    TextFont {
-                        font_size: FontSize::Px(11.0),
-                        ..default()
-                    },
-                    TextColor(ui::BIANCO),
-                    Anchor::BOTTOM_RIGHT,
-                    Transform::from_xyz(0.0, 0.0, 0.3),
-                    Numero,
-                ));
-            })
-            .id();
-        station.celle.insert(cella, e);
+        let etichetta = costruisci_modulo(&mut commands, &mut station, &art, &griglia, kind, cella);
         log.info(sim.tick, format!("Costruito: {}", etichetta));
+        audio::suona(&mut commands, &suoni.costruzione);
     }
 
     if destro && let Some(e) = station.celle.remove(&cella) {
@@ -649,6 +680,7 @@ fn input_mouse(
             log.info(sim.tick, format!("Rimosso: {}", m.etichetta));
         }
         commands.entity(e).despawn();
+        audio::suona(&mut commands, &suoni.rimozione);
     }
 }
 
@@ -874,6 +906,87 @@ fn visibilita_scena(
     };
     for mut vis in &mut q {
         *vis = v;
+    }
+}
+
+/// F12: screenshot della finestra nella cartella corrente, in ogni schermata.
+fn screenshot_tasto(mut commands: Commands, tasti: Res<ButtonInput<KeyCode>>) {
+    use bevy::render::view::window::screenshot::{Screenshot, save_to_disk};
+    if tasti.just_pressed(KeyCode::F12) {
+        let epoch = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map(|d| d.as_secs())
+            .unwrap_or(0);
+        commands
+            .spawn(Screenshot::primary_window())
+            .observe(save_to_disk(format!("space-station-{epoch}.png")));
+    }
+}
+
+/// Servizio fotografico: con `DEMO_FOTO=<cartella>` il gioco si guida da
+/// solo — fotografa il titolo, apre una partita Infinita, costruisce una
+/// stazione d'esempio, avvia la simulazione, scatta due volte ed esce.
+/// Serve al manuale (docs/img) e a qualunque materiale illustrativo: foto
+/// riproducibili senza mani umane. I numeri sono frame a ~60 fps.
+#[allow(clippy::too_many_arguments)]
+fn demo_foto(
+    mut commands: Commands,
+    mut frame: Local<u32>,
+    mut modalita: ResMut<Modalita>,
+    mut reset: ResMut<RichiestaReset>,
+    mut prossimo: ResMut<NextState<AppState>>,
+    mut station: ResMut<Station>,
+    mut sim: ResMut<Sim>,
+    art: Res<Art>,
+    griglia: Res<Griglia>,
+    mut esci: MessageWriter<AppExit>,
+) {
+    use bevy::render::view::window::screenshot::{Screenshot, save_to_disk};
+    let Ok(cartella) = std::env::var("DEMO_FOTO") else {
+        return;
+    };
+    *frame += 1;
+    let scatta = |commands: &mut Commands, nome: &str| {
+        commands
+            .spawn(Screenshot::primary_window())
+            .observe(save_to_disk(format!("{cartella}/{nome}")));
+    };
+    match *frame {
+        20 => scatta(&mut commands, "titolo.png"),
+        40 => {
+            *modalita = Modalita::Infinita;
+            reset.0 = true;
+            prossimo.set(AppState::InGioco);
+        }
+        80 => {
+            // stazione d'esempio in equilibrio: un reattore regge tutto
+            let piano = [
+                (ModuleKind::Reattore, 5, 4),
+                (ModuleKind::LifeSupport, 6, 4),
+                (ModuleKind::Dormitorio, 7, 4),
+                (ModuleKind::Dormitorio, 8, 4),
+                (ModuleKind::Radiatore, 5, 3),
+                (ModuleKind::Corridoio, 6, 3),
+                (ModuleKind::Laboratorio, 7, 3),
+            ];
+            for (kind, x, y) in piano {
+                costruisci_modulo(
+                    &mut commands,
+                    &mut station,
+                    &art,
+                    &griglia,
+                    kind,
+                    IVec2::new(x, y),
+                );
+            }
+            sim.running = true;
+        }
+        110 => scatta(&mut commands, "costruzione.png"),
+        560 => scatta(&mut commands, "partita.png"),
+        600 => {
+            esci.write(AppExit::Success);
+        }
+        _ => {}
     }
 }
 

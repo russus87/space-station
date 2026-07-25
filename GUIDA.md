@@ -127,12 +127,17 @@ con il 2). Un modulo fermo mostra un simbolo che dice il perché:
 
 | Input | Azione |
 |---|---|
-| `1`–`6` | Seleziona il modulo dalla palette |
+| `1`–`6` | Seleziona un modulo base dalla palette |
+| `7` `8` `9` `0` `C` | Seleziona un modulo sbloccabile (Batteria, Serra, Gru, Condotto, Centro comando — si conquistano completando i livelli 5/15/25/35/45 della campagna) |
 | Click sinistro | Piazza il modulo selezionato nella cella libera |
 | Click destro | Rimuove il modulo sotto il cursore (perso, non recuperabile) |
 | `R` | Ripara il modulo in avaria sotto il cursore (gratis) |
+| `M` | Apre il mercato interno: 3 offerte casuali a partita, si pagano coi punti (mai soldi veri) |
 | `Spazio` | Avvia/ferma la simulazione |
 | `Esc` | Apre il menu di pausa (riprendi, ricomincia, torna al titolo) |
+
+Per moduli sbloccabili, personaggi, storia e mercato nel dettaglio c'è il
+**MANUALE.md** — questa guida copre le basi.
 
 Attenzione alla differenza: `Spazio` ferma il **tempo della stazione** — la
 modalità in cui progetti con calma, mentre l'HUD ti mostra comunque

@@ -193,10 +193,15 @@ pub struct Riga {
 #[derive(Resource, Default)]
 pub struct EventLog {
     righe: Vec<Riga>,
+    /// Righe scritte dall'inizio del processo, MAI azzerato (nemmeno da
+    /// `svuota`): serve all'audio per contare le righe nuove per frame
+    /// anche se il buffer visibile è cappato a 60.
+    totale: usize,
 }
 
 impl EventLog {
     pub fn push(&mut self, tick: u64, gravita: Gravita, testo: impl Into<String>) {
+        self.totale += 1;
         self.righe.push(Riga {
             tick,
             gravita,
@@ -205,6 +210,10 @@ impl EventLog {
         if self.righe.len() > 60 {
             self.righe.drain(..self.righe.len() - 60);
         }
+    }
+
+    pub fn totale(&self) -> usize {
+        self.totale
     }
     pub fn info(&mut self, tick: u64, testo: impl Into<String>) {
         self.push(tick, Gravita::Info, testo);

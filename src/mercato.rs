@@ -263,6 +263,7 @@ pub fn click_offerte(
     mut sim: ResMut<Sim>,
     mut station: ResMut<Station>,
     mut log: ResMut<EventLog>,
+    suoni: Res<crate::audio::Suoni>,
     mut moduli: Query<&mut Module>,
     ostacoli_q: Query<(Entity, &Ostacolo)>,
 ) {
@@ -327,6 +328,7 @@ pub fn click_offerte(
             }
         }
         log.info(sim.tick, format!("Mercato: {} ({} punti)", f.nome, f.costo));
+        crate::audio::suona(&mut commands, &suoni.acquisto);
     }
 }
 

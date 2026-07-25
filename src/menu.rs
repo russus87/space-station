@@ -28,6 +28,9 @@ pub enum AppState {
     SelezioneLivello,
     /// Nome, briefing e obiettivo del livello scelto, prima di cominciare.
     Briefing,
+    /// Schermata di storia (diario di bordo) prima del briefing dei livelli
+    /// chiave della campagna: solo la prima volta che ci si arriva.
+    Intermezzo,
     /// Top 10 delle partite in modalità infinita.
     SchermataClassifica,
     InGioco,
@@ -82,6 +85,8 @@ pub enum Azione {
     ApriClassifica,
     /// Dalla selezione livello al briefing del livello i (0-based).
     ScegliLivello(usize),
+    /// Dall'intermezzo al briefing del livello già scelto.
+    ApriBriefing,
     /// Dal briefing alla partita, in modalità campagna.
     IniziaLivello,
     /// Da "livello completato" al briefing del livello successivo.
@@ -593,6 +598,64 @@ pub fn entra_briefing(
         });
 }
 
+// ---------------- Intermezzo (storia) ----------------
+
+#[derive(Component)]
+pub struct SchermataIntermezzo;
+
+/// Diario di bordo dei livelli chiave (1, 11, 21, 31, 41): il personaggio
+/// del blocco racconta la svolta. Si vede solo la prima volta che si
+/// raggiunge il livello; "Continua" porta al briefing normale.
+pub fn entra_intermezzo(
+    mut commands: Commands,
+    scelto: Res<LivelloScelto>,
+    art: Res<Art>,
+    mut sel: ResMut<Selezione>,
+) {
+    let Some(intermezzo) = crate::personaggi::intermezzo_per(scelto.0 + 1) else {
+        // non dovrebbe succedere: lo stato si apre solo se l'intermezzo c'è
+        return;
+    };
+    *sel = Selezione {
+        idx: 0,
+        n: 1,
+        conferma: None,
+    };
+    commands
+        .spawn((
+            radice_centrata(),
+            BackgroundColor(NERO),
+            GlobalZIndex(10),
+            SchermataIntermezzo,
+        ))
+        .with_children(|r| {
+            r.spawn(testo(
+                format!("DIARIO DI BORDO — LIVELLO {}", scelto.0 + 1),
+                15.0,
+                GRIGIO_MEDIO,
+            ));
+            r.spawn((Node {
+                margin: UiRect::bottom(Val::Px(16.0)),
+                ..default()
+            },))
+            .with_children(|c| {
+                c.spawn(testo(intermezzo.titolo, 30.0, BIANCO));
+            });
+            fumetto(r, &art, intermezzo.personaggio, intermezzo.testo);
+            r.spawn(Node {
+                height: Val::Px(8.0),
+                ..default()
+            });
+            voce(r, 0, Azione::ApriBriefing, "Continua");
+        });
+}
+
+pub fn esci_intermezzo(mut commands: Commands, q: Query<Entity, With<SchermataIntermezzo>>) {
+    for e in &q {
+        commands.entity(e).despawn();
+    }
+}
+
 pub fn esci_briefing(mut commands: Commands, q: Query<Entity, With<SchermataBriefing>>) {
     for e in &q {
         commands.entity(e).despawn();
@@ -783,6 +846,9 @@ pub fn entra_completato(
                         BIANCO,
                     ));
                 });
+                // il finale della storia chiude tutti gli archi
+                let (personaggio, testo_finale) = crate::personaggi::FINALE;
+                fumetto(r, &art, personaggio, testo_finale);
                 voce(r, 0, Azione::IndietroTitolo, "Torna al titolo");
             } else if in_casuale {
                 voce(r, 0, Azione::GiocaCasuale, "Nuovo livello casuale");
@@ -975,6 +1041,7 @@ pub fn naviga(
     mut modalita: ResMut<Modalita>,
     mut scelto: ResMut<LivelloScelto>,
     mut casuale: ResMut<LivelloCasuale>,
+    progressione: Res<Progressione>,
     stato: Res<State<AppState>>,
     mut prossimo: ResMut<NextState<AppState>>,
     mut esci: MessageWriter<AppExit>,
@@ -1003,7 +1070,9 @@ pub fn naviga(
             AppState::SelezioneLivello | AppState::SchermataClassifica => {
                 prossimo.set(AppState::Titolo);
             }
-            AppState::Briefing => prossimo.set(AppState::SelezioneLivello),
+            AppState::Briefing | AppState::Intermezzo => {
+                prossimo.set(AppState::SelezioneLivello);
+            }
             // A stazione persa (o a livello finito) Esc non ha scorciatoie:
             // si sceglie una voce.
             AppState::Titolo | AppState::FinePartita | AppState::LivelloCompletato => {}
@@ -1050,6 +1119,7 @@ pub fn naviga(
                 &mut modalita,
                 &mut scelto,
                 &mut casuale,
+                &progressione,
                 attuale,
                 &mut prossimo,
                 &mut esci,
@@ -1068,6 +1138,7 @@ pub fn click_voci(
     mut modalita: ResMut<Modalita>,
     mut scelto: ResMut<LivelloScelto>,
     mut casuale: ResMut<LivelloCasuale>,
+    progressione: Res<Progressione>,
     stato: Res<State<AppState>>,
     mut prossimo: ResMut<NextState<AppState>>,
     mut esci: MessageWriter<AppExit>,
@@ -1093,6 +1164,7 @@ pub fn click_voci(
                     &mut modalita,
                     &mut scelto,
                     &mut casuale,
+                    &progressione,
                     attuale,
                     &mut prossimo,
                     &mut esci,
@@ -1114,6 +1186,7 @@ fn esegui(
     modalita: &mut Modalita,
     scelto: &mut LivelloScelto,
     casuale: &mut LivelloCasuale,
+    progressione: &Progressione,
     attuale: AppState,
     prossimo: &mut NextState<AppState>,
     esci: &mut MessageWriter<AppExit>,
@@ -1151,8 +1224,16 @@ fn esegui(
         Azione::ApriClassifica => prossimo.set(AppState::SchermataClassifica),
         Azione::ScegliLivello(i) => {
             scelto.0 = i;
-            prossimo.set(AppState::Briefing);
+            // la storia si mostra solo la prima volta che si arriva al
+            // livello; rigiocando, dritti al briefing
+            if progressione.completati == i && crate::personaggi::intermezzo_per(i + 1).is_some()
+            {
+                prossimo.set(AppState::Intermezzo);
+            } else {
+                prossimo.set(AppState::Briefing);
+            }
         }
+        Azione::ApriBriefing => prossimo.set(AppState::Briefing),
         Azione::IniziaLivello => {
             *modalita = Modalita::Campagna(scelto.0);
             reset.0 = true;
