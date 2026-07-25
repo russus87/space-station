@@ -4,7 +4,7 @@
 //! e al resize i testi si scollavano dalla scena.
 //! Solo la griglia e i moduli restano in world-space (vedi `main.rs`).
 
-use crate::livelli::{LIVELLI, LivelloCasuale, Modalita, StatoLivello};
+use crate::livelli::{LIVELLI, LivelloCasuale, Modalita, Progressione, StatoLivello};
 use crate::menu::{AppState, Pausa};
 use crate::modules::{KINDS, ModuleKind};
 use crate::sim::{
@@ -39,6 +39,10 @@ pub struct RadiceGioco;
 #[derive(Component)]
 pub struct BottoneMenu;
 
+/// Il tasto MERCATO nell'HUD: apre il mercato, come M (vedi mercato.rs).
+#[derive(Component)]
+pub struct BottoneMercato;
+
 #[derive(Component, Clone, Copy)]
 pub enum CampoHud {
     Stato,
@@ -60,9 +64,14 @@ pub enum CampoHud {
 #[derive(Component)]
 pub struct BarraOssigeno;
 
-/// Slot della palette laterale; l'indice è anche il tasto (1..6).
+/// Slot della palette laterale; l'indice segue `KINDS` (vedi `tasto_slot`).
 #[derive(Component)]
 pub struct SlotPalette(pub usize);
+
+/// La riga dei costi di uno slot: mostra i costi se il modulo è sbloccato,
+/// la soglia di sblocco altrimenti (aggiornata da `update_palette`).
+#[derive(Component)]
+pub struct CostoSlot(pub usize);
 
 #[derive(Component)]
 pub struct RigaLog(pub usize);
@@ -247,6 +256,20 @@ pub fn setup_ui(mut commands: Commands, art: Res<Art>) {
                 .with_children(|c| {
                     c.spawn((testo("", 13.0, GRIGIO_MEDIO), CampoHud::Punteggio));
                 });
+                hud.spawn((
+                    Node {
+                        padding: UiRect::axes(Val::Px(12.0), Val::Px(5.0)),
+                        margin: UiRect::right(Val::Px(6.0)),
+                        border: UiRect::all(Val::Px(1.0)),
+                        ..default()
+                    },
+                    BorderColor::all(GRIGIO_SCAFO),
+                    Button,
+                    BottoneMercato,
+                ))
+                .with_children(|c| {
+                    c.spawn(testo("MERCATO m", 13.0, METALLO));
+                });
                 // uscita sempre visibile: il menu esisteva solo dietro Esc e
                 // al playtest nessuno l'ha trovato — un tasto a schermo è
                 // l'unica affordance che non richiede di conoscere il comando
@@ -357,6 +380,11 @@ pub fn setup_ui(mut commands: Commands, art: Res<Art>) {
         });
 }
 
+/// Etichetta del tasto dello slot `i`: 1..6 per i base, poi 7 8 9 0 C.
+fn tasto_slot(i: usize) -> &'static str {
+    ["1", "2", "3", "4", "5", "6", "7", "8", "9", "0", "C"][i]
+}
+
 fn slot_palette(col: &mut ChildSpawnerCommands, art: &Art, i: usize, kind: ModuleKind) {
     let def = kind.def();
     col.spawn((
@@ -387,8 +415,14 @@ fn slot_palette(col: &mut ChildSpawnerCommands, art: &Art, i: usize, kind: Modul
             ..default()
         },))
             .with_children(|t| {
-                t.spawn(testo(format!("{}  {}", i + 1, def.nome), 12.0, BIANCO));
-                t.spawn(testo(costi_compatti(kind), 11.0, GRIGIO_MEDIO));
+                t.spawn(testo(
+                    format!("{}  {}", tasto_slot(i), def.nome),
+                    12.0,
+                    BIANCO,
+                ));
+                // il contenuto vero lo scrive `update_palette` a ogni frame:
+                // costi se sbloccato, soglia di sblocco se ancora no
+                t.spawn((testo("", 11.0, GRIGIO_MEDIO), CostoSlot(i)));
             });
     });
 }
@@ -501,7 +535,14 @@ pub fn update_hud(
                 }
             }
             CampoHud::EnergiaFlusso => {
-                t.0 = format!("prod {:.0} · cons {:.0}", sim.energia_prod, sim.energia_cons);
+                t.0 = if sim.batterie_capienza > 0.0 {
+                    format!(
+                        "prod {:.0} · cons {:.0} · batt {:.0}/{:.0}",
+                        sim.energia_prod, sim.energia_cons, sim.batterie_carica, sim.batterie_capienza
+                    )
+                } else {
+                    format!("prod {:.0} · cons {:.0}", sim.energia_prod, sim.energia_cons)
+                };
                 c.0 = GRIGIO_MEDIO;
             }
             CampoHud::EnergiaMargine => {
@@ -591,22 +632,45 @@ pub fn update_hud(
 
 pub fn update_palette(
     sel: Res<Selected>,
-    mut q: Query<(&SlotPalette, &mut BackgroundColor, &mut BorderColor)>,
+    progressione: Res<Progressione>,
+    mut slot_q: Query<(&SlotPalette, &mut BackgroundColor, &mut BorderColor)>,
+    mut costi_q: Query<(&CostoSlot, &mut Text, &mut TextColor)>,
 ) {
-    for (slot, mut bg, mut bordo) in &mut q {
-        let scelto = KINDS[slot.0] == sel.0;
-        bg.0 = if scelto { GRIGIO_SCAFO } else { SCAFO_SCURO };
+    for (slot, mut bg, mut bordo) in &mut slot_q {
+        let bloccato = progressione.completati < KINDS[slot.0].def().sblocco;
+        let scelto = !bloccato && KINDS[slot.0] == sel.0;
+        bg.0 = if scelto {
+            GRIGIO_SCAFO
+        } else if bloccato {
+            NERO
+        } else {
+            SCAFO_SCURO
+        };
         *bordo = BorderColor::all(if scelto { BIANCO } else { Color::NONE });
+    }
+    for (costo, mut t, mut c) in &mut costi_q {
+        let def = KINDS[costo.0].def();
+        if progressione.completati < def.sblocco {
+            t.0 = format!("si sblocca al livello {}", def.sblocco);
+            c.0 = GRIGIO_SCAFO;
+        } else {
+            t.0 = costi_compatti(KINDS[costo.0]);
+            c.0 = GRIGIO_MEDIO;
+        }
     }
 }
 
-/// Click su uno slot = stessa cosa del tasto numerico.
+/// Click su uno slot = stessa cosa del tasto: gli slot bloccati non
+/// rispondono.
 pub fn click_palette(
     q: Query<(&Interaction, &SlotPalette), Changed<Interaction>>,
+    progressione: Res<Progressione>,
     mut sel: ResMut<Selected>,
 ) {
     for (interazione, slot) in &q {
-        if *interazione == Interaction::Pressed {
+        if *interazione == Interaction::Pressed
+            && progressione.completati >= KINDS[slot.0].def().sblocco
+        {
             sel.0 = KINDS[slot.0];
         }
     }

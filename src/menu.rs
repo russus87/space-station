@@ -10,6 +10,7 @@ use crate::livelli::{
 };
 use rand::RngExt;
 use crate::modules::{KINDS, TABELLA};
+use crate::personaggi::{PERSONAGGI, annuncio_sblocco, battuta_briefing};
 use crate::sim::{MotivoFine, OSSIGENO_PER_CREW, Sim, TICK_SURRISCALDAMENTO, TICK_SECS};
 use crate::ui::{
     BIANCO, CIANO, GIALLO, GRIGIO_MEDIO, GRIGIO_SCAFO, METALLO, NERO, ROSSO, SCAFO_SCURO, VERDE,
@@ -180,6 +181,53 @@ fn voce(p: &mut ChildSpawnerCommands, idx: usize, azione: Azione, etichetta: imp
     ))
     .with_children(|c| {
         c.spawn(testo(etichetta, 18.0, METALLO));
+    });
+}
+
+/// Box a fumetto: ritratto del personaggio a sinistra, nome/ruolo e
+/// balloon con la battuta a destra. Usato nel briefing e a livello
+/// completato (annuncio degli sblocchi).
+fn fumetto(p: &mut ChildSpawnerCommands, art: &Art, personaggio: usize, battuta: &str) {
+    let chi = &PERSONAGGI[personaggio];
+    p.spawn(Node {
+        flex_direction: FlexDirection::Row,
+        align_items: AlignItems::FlexStart,
+        column_gap: Val::Px(10.0),
+        margin: UiRect::bottom(Val::Px(14.0)),
+        max_width: Val::Px(500.0),
+        ..default()
+    })
+    .with_children(|riga| {
+        riga.spawn((
+            ImageNode::new(art.ritratti[chi.ritratto].clone()),
+            Node {
+                width: Val::Px(64.0),
+                height: Val::Px(64.0),
+                flex_shrink: 0.0,
+                ..default()
+            },
+        ));
+        riga.spawn(Node {
+            flex_direction: FlexDirection::Column,
+            row_gap: Val::Px(4.0),
+            ..default()
+        })
+        .with_children(|col| {
+            col.spawn(testo(format!("{} — {}", chi.nome, chi.ruolo), 13.0, CIANO));
+            col.spawn((
+                Node {
+                    border: UiRect::all(Val::Px(1.0)),
+                    padding: UiRect::axes(Val::Px(10.0), Val::Px(7.0)),
+                    max_width: Val::Px(420.0),
+                    ..default()
+                },
+                BorderColor::all(GRIGIO_SCAFO),
+                BackgroundColor(SCAFO_SCURO),
+            ))
+            .with_children(|balloon| {
+                balloon.spawn(testo(format!("\u{201C}{battuta}\u{201D}"), 14.0, BIANCO));
+            });
+        });
     });
 }
 
@@ -491,9 +539,11 @@ pub fn esci_selezione(mut commands: Commands, q: Query<Entity, With<SchermataSel
 pub struct SchermataBriefing;
 
 /// Nome, briefing e obiettivo per esteso, prima di cominciare il livello.
+/// Nei livelli chiave un personaggio commenta il briefing a fumetto.
 pub fn entra_briefing(
     mut commands: Commands,
     scelto: Res<LivelloScelto>,
+    art: Res<Art>,
     mut sel: ResMut<Selezione>,
 ) {
     let l = &LIVELLI[scelto.0];
@@ -535,6 +585,9 @@ pub fn entra_briefing(
                     CIANO,
                 ));
             });
+            if let Some((personaggio, battuta)) = battuta_briefing(scelto.0 + 1) {
+                fumetto(r, &art, personaggio, battuta);
+            }
             voce(r, 0, Azione::IniziaLivello, "Inizia");
             voce(r, 1, Azione::ApriCampagna, "Indietro");
         });
@@ -660,6 +713,7 @@ pub fn entra_completato(
     sim: Res<Sim>,
     modalita: Res<Modalita>,
     casuale: Res<LivelloCasuale>,
+    art: Res<Art>,
     mut sel: ResMut<Selezione>,
 ) {
     let in_casuale = matches!(*modalita, Modalita::Casuale);
@@ -710,6 +764,13 @@ pub fn entra_completato(
             .with_children(|c| {
                 c.spawn(testo(format!("Tick: {}", sim.tick), 14.0, METALLO));
             });
+            // ai traguardi della campagna il personaggio di turno presenta
+            // il modulo appena sbloccato (comparirà nella palette)
+            if let Modalita::Campagna(i) = *modalita
+                && let Some((personaggio, battuta)) = annuncio_sblocco(i + 1)
+            {
+                fumetto(r, &art, personaggio, battuta);
+            }
             if ultimo {
                 r.spawn((Node {
                     margin: UiRect::bottom(Val::Px(10.0)),

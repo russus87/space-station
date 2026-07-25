@@ -12,10 +12,11 @@ Ordine di priorità degli interventi:
 
 Il log eventi funziona e resta, concettualmente invariato.
 
-> **Iterazione 4 (proposta)**: campagna a 50 livelli, generatore, sblocchi
-> di moduli e personaggi — vedi `SPEC-CAMPAGNA.md`. Quel documento è una
-> proposta in attesa di approvazione: quando le sue parti verranno
-> implementate, migreranno qui.
+> **Iterazione 4**: campagna a 50 livelli col generatore (§13.2), moduli
+> sbloccabili, personaggi a fumetto e mercato interno sono **implementati**
+> (vedi `MANUALE.md` per il quadro giocatore e `SPEC-CAMPAGNA.md` per il
+> disegno originale e ciò che resta da fare: tratti passivi dei personaggi,
+> intermezzi, velocità di gioco, stelle, eventi con scelta).
 
 ---
 
@@ -514,13 +515,14 @@ obiettivi. Il codice sta in `src/livelli.rs`; la simulazione non cambia
 regole (unica aggiunta a `Sim`: il contatore di solo output
 `avarie_surriscaldamento`, incrementato dove l'avaria già avveniva).
 
-### 13.1 Tre modalità
+### 13.1 Quattro modalità
 
 | Modalità | Cos'è | Tetto di tick | Punteggio |
 |---|---|---|---|
 | **Campagna** | Sei livelli in sequenza, ognuno con un obiettivo misurabile. Si vince il livello raggiungendo l'obiettivo; si perde con la stazione o a tetto di tick raggiunto. Completare un livello sblocca il successivo. | Sì (400) | Mostrato nell'HUD ma **non** entra in classifica |
 | **Infinita** | Sandbox senza obiettivi, con la fine partita esistente: si resiste quanto si riesce. | No | Sorgente della classifica **Infinita** |
 | **Sfida** | Come Infinita — nessun obiettivo, si punta al punteggio — ma con lo stesso tetto della Campagna: partite più brevi, esito garantito entro un tempo fisso. | Sì (400) | Sorgente della classifica **Sfida** |
+| **Casuale** | Un livello generato al momento (obiettivo attivo come in campagna), fuori da progressione e classifiche. | Sì (400) | Solo a schermo |
 
 Aggiunta dopo un playtest in cui una partita Infinita persa in sostanza
 (spirale di asfissia lenta) si è trascinata per centinaia di tick senza
@@ -530,7 +532,7 @@ limiti resta su Infinita. **Le due classifiche restano separate** (sez.
 13.4): un punteggio Infinita non è confrontabile con uno Sfida, il primo
 può sempre vincere solo restando in piedi più a lungo.
 
-La risorsa `Modalita` (`Infinita` / `Sfida` / `Campagna(indice)`) dice in
+La risorsa `Modalita` (`Infinita` / `Sfida` / `Campagna(indice)` / `Casuale`) dice in
 che modalità si sta giocando; il sistema degli obiettivi gira **solo** in
 Campagna (run condition `campagna_attiva`) — Sfida non ha obiettivi, come
 Infinita.

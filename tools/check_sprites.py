@@ -24,6 +24,11 @@ MODULI = {
     "laboratorio": gs.LABORATORIO,
     "radiatore": gs.RADIATORE,
     "corridoio": gs.CORRIDOIO,
+    "batteria": gs.BATTERIA,
+    "serra": gs.SERRA,
+    "gru": gs.GRU,
+    "condotto": gs.CONDOTTO,
+    "centro_comando": gs.CENTRO_COMANDO,
 }
 
 SOGLIA_IOU = 80.0  # sopra questa soglia due sagome sono "quasi identiche"

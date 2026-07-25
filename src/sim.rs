@@ -19,6 +19,9 @@ pub const SOGLIA_O2_CRITICO: f32 = 30.0;
 pub const TICK_SURRISCALDAMENTO: u32 = 6; // tick consecutivi di calore in eccesso prima di un'avaria
 pub const TICK_MORTE: u32 = 3; // con ossigeno a zero, un morto ogni N tick
 pub const TICK_ARRIVO: u32 = 4; // con posti liberi e aria buona, un arrivo ogni N tick
+pub const CAPIENZA_BATTERIA: f32 = 150.0; // energia immagazzinabile per batteria
+pub const RICARICA_BATTERIA: f32 = 15.0; // carica massima per tick, dal surplus di rete
+pub const TICK_LAVORO_GRU: u32 = 12; // tick attivi consecutivi per rimuovere un detrito
 /// Tetto di sicurezza: oltre questo tick la partita finisce comunque, vinta o
 /// no. Senza, una stazione bloccata in una spirale di asfissia lenta (morti
 /// a un membro ogni `TICK_MORTE` tick) può trascinarsi per centinaia di tick
@@ -35,6 +38,11 @@ pub struct Module {
     pub broken: bool,
     pub staffed: bool,   // significativo solo per i laboratori
     pub collegato: bool, // la sua rete contiene un reattore non in avaria
+    /// Energia immagazzinata (solo Batteria), 0..=CAPIENZA_BATTERIA.
+    pub carica: f32,
+    /// Tick attivi consecutivi (solo Gru): a TICK_LAVORO_GRU scatta la
+    /// rimozione del detrito adiacente (effetto spaziale in main.rs).
+    pub lavoro: u32,
 }
 
 impl Module {
@@ -91,6 +99,9 @@ pub struct Sim {
     pub energia_prod: f32,
     pub energia_cons: f32,
     pub energia_margine: f32,
+    /// Somma delle cariche delle batterie non rotte (0 se non ce ne sono).
+    pub batterie_carica: f32,
+    pub batterie_capienza: f32,
     pub in_blackout: bool,
     pub o2_prod: f32,
     pub o2_cons: f32,
@@ -143,6 +154,8 @@ impl Default for Sim {
             energia_prod: 0.0,
             energia_cons: 0.0,
             energia_margine: 0.0,
+            batterie_carica: 0.0,
+            batterie_capienza: 0.0,
             in_blackout: false,
             o2_prod: 0.0,
             o2_cons: 0.0,
@@ -302,6 +315,19 @@ pub fn sim_tick(
             con_reattore[comp[i]] = true;
         }
     }
+    // Le batterie mettono la carica accumulata a disposizione PRIMA della
+    // distribuzione: in deficit la rete attinge da loro invece di spegnere
+    // moduli. Quanto hanno ceduto davvero si regola dopo il giro; una rete
+    // senza reattore non le attiva (la carica resta lì, inerte).
+    let mut accumulo = vec![0.0f32; n_comp];
+    for (i, m) in mods.iter().enumerate() {
+        if !m.broken && m.kind == ModuleKind::Batteria && con_reattore[comp[i]] {
+            accumulo[comp[i]] += m.carica;
+        }
+    }
+    for c in 0..n_comp {
+        pool[c] += accumulo[c];
+    }
     let mut blackout = false;
     for (i, m) in mods.iter_mut().enumerate() {
         let def = m.kind.def();
@@ -339,6 +365,12 @@ pub fn sim_tick(
             m.powered = false;
             continue;
         }
+        // la batteria non consuma dal pool: è il pool (carica/scarica
+        // regolate dopo il giro), quindi collegata = sempre operativa
+        if m.kind == ModuleKind::Batteria {
+            m.powered = true;
+            continue;
+        }
         let rete = &mut pool[comp[i]];
         if *rete + def.energia >= 0.0 {
             *rete += def.energia;
@@ -369,9 +401,59 @@ pub fn sim_tick(
         .filter(|m| m.powered && !m.broken && m.kind.def().energia < 0.0)
         .map(|m| -m.kind.def().energia)
         .sum();
-    // somma dei residui delle reti: le reti senza reattore valgono zero
-    sim.energia_margine = pool.iter().sum();
+    // Regolamento batterie, per rete: quanto è stato attinto (accumulo −
+    // residuo, se positivo) si scala dalle cariche in ordine di costruzione;
+    // il surplus vero dei generatori le ricarica (max RICARICA_BATTERIA a
+    // testa per tick). In anteprima (pausa) le cariche non si toccano.
+    if vivo {
+        let mut da_scalare: Vec<f32> = (0..n_comp)
+            .map(|c| (accumulo[c] - pool[c]).max(0.0))
+            .collect();
+        let mut surplus: Vec<f32> = (0..n_comp)
+            .map(|c| (pool[c] - accumulo[c]).max(0.0))
+            .collect();
+        for (i, m) in mods.iter_mut().enumerate() {
+            if m.broken || m.kind != ModuleKind::Batteria || !con_reattore[comp[i]] {
+                continue;
+            }
+            let c = comp[i];
+            let prelievo = da_scalare[c].min(m.carica);
+            m.carica -= prelievo;
+            da_scalare[c] -= prelievo;
+            let ricarica = surplus[c].min(RICARICA_BATTERIA).min(CAPIENZA_BATTERIA - m.carica);
+            m.carica += ricarica;
+            surplus[c] -= ricarica;
+        }
+    }
+    // margine = surplus reale dei generatori (negativo quando le reti
+    // stanno andando a batteria: il numero racconta esattamente questo)
+    sim.energia_margine = (0..n_comp).map(|c| pool[c] - accumulo[c]).sum();
+    sim.batterie_carica = mods
+        .iter()
+        .filter(|m| !m.broken && m.kind == ModuleKind::Batteria)
+        .map(|m| m.carica)
+        .sum();
+    sim.batterie_capienza = mods
+        .iter()
+        .filter(|m| !m.broken && m.kind == ModuleKind::Batteria)
+        .count() as f32
+        * CAPIENZA_BATTERIA;
     sim.in_blackout = blackout;
+
+    // La Gru lavora solo da attiva: il contatore avanza coi tick effettivi
+    // e riparte da zero se si spegne; a TICK_LAVORO_GRU scatta l'effetto
+    // (rimozione del detrito adiacente, in main.rs: qui non c'è la griglia).
+    if vivo {
+        for m in mods.iter_mut() {
+            if m.kind == ModuleKind::Gru {
+                if m.attivo() {
+                    m.lavoro += 1;
+                } else {
+                    m.lavoro = 0;
+                }
+            }
+        }
+    }
 
     // --- 3) bilancio ossigeno (cascata stadio 2) ---
     let attivo = |m: &Module| m.attivo();
@@ -431,9 +513,18 @@ pub fn sim_tick(
     } else {
         sim.cd_morte = 0;
     }
+    // il Centro comando attivo dimezza l'attesa dei nuovi arrivi
+    let cadenza_arrivo = if mods
+        .iter()
+        .any(|m| m.kind == ModuleKind::CentroComando && m.attivo())
+    {
+        TICK_ARRIVO / 2
+    } else {
+        TICK_ARRIVO
+    };
     if sim.equipaggio < sim.posti_letto && sim.ossigeno > 50.0 {
         sim.cd_arrivo += 1;
-        if sim.cd_arrivo >= TICK_ARRIVO {
+        if sim.cd_arrivo >= cadenza_arrivo {
             sim.cd_arrivo = 0;
             let prima = sim.equipaggio;
             sim.equipaggio += 1;

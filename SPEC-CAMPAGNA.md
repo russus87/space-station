@@ -1,10 +1,15 @@
 # SPEC — Campagna lunga, generatore e sblocchi (iterazione 4)
 
-> **STATO: PROPOSTA, in attesa di approvazione.** Niente di questo documento
-> è implementato. Ogni sezione marcata ⚠ cambia le regole della simulazione
-> e richiede un sì esplicito (stessa convenzione di SPEC.md §10). Una volta
-> implementata, la sezione corrispondente migra in SPEC.md e questo file si
-> accorcia.
+> **STATO: IN GRAN PARTE IMPLEMENTATA** (approvazione dell'utente arrivata a
+> pezzi durante il playtest). Fatto: generatore e campagna a 50 (§2, in
+> SPEC.md §13.2), livello casuale (§2.4), i 5 moduli sbloccabili (§3), i
+> personaggi come voci narrative a fumetto nei briefing e negli annunci di
+> sblocco (parte di §4 — i **tratti passivi** no, restano proposta), più il
+> **mercato interno** (non in questo documento: catalogo e regole in
+> `MANUALE.md` e `src/mercato.rs` — si paga in punti partita, niente valuta
+> reale). Restano proposte: tratti dei personaggi (§4), intermezzi (§6),
+> livelli curati di fine blocco, e le estensioni §9 (eventi, riparazione
+> con costo, velocità, stelle, audio, sfida del giorno).
 
 Obiettivo dell'iterazione, nelle parole del giocatore: campagna lunga
 (~50 livelli) percorsa in modo lineare, sblocchi che danno cose utili ogni

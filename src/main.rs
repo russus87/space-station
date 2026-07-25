@@ -7,6 +7,8 @@
 mod generatore;
 mod livelli;
 mod menu;
+mod mercato;
+mod personaggi;
 mod modules;
 mod sim;
 mod ui;
@@ -18,7 +20,7 @@ use bevy::window::{PrimaryWindow, Window, WindowPlugin};
 use livelli::{LIVELLI, Modalita};
 use menu::{AppState, Pausa};
 use modules::{KINDS, ModuleKind};
-use sim::{EventLog, Fermo, Module, Sim, TICK_MASSIMO};
+use sim::{EventLog, Fermo, Module, Sim, TICK_LAVORO_GRU, TICK_MASSIMO};
 
 const WIN_W: f32 = 1160.0;
 const WIN_H: f32 = 800.0;
@@ -30,7 +32,10 @@ const ART: f32 = 32.0; // dimensione nativa dell'art di una cella
 /// pannello ispezione e pagina della guida.
 #[derive(Resource)]
 pub struct Art {
-    pub moduli: [Handle<Image>; 6],
+    pub moduli: [Handle<Image>; 11],
+    /// Ritratti dei personaggi per i fumetti dei briefing, nell'ordine di
+    /// `personaggi::PERSONAGGI`.
+    pub ritratti: [Handle<Image>; 5],
     pub badge_energia: Handle<Image>,
     pub badge_equipaggio: Handle<Image>,
     pub badge_avaria: Handle<Image>,
@@ -68,16 +73,16 @@ pub struct RichiestaReset(pub bool);
 
 /// Occupazione della griglia e contatori per battezzare i moduli ("Reattore 2").
 #[derive(Resource, Default)]
-struct Station {
-    celle: HashMap<IVec2, Entity>,
+pub(crate) struct Station {
+    pub(crate) celle: HashMap<IVec2, Entity>,
     /// Celle occupate dai detriti del livello: non edificabili, non
     /// rimovibili. Vuoto in modalità Infinita.
-    ostacoli: HashSet<IVec2>,
+    pub(crate) ostacoli: HashSet<IVec2>,
     /// Tetto di moduli costruibili (corridoi inclusi): `Some` solo in
     /// campagna, dal campo `max_moduli` del livello. Rimuovere un modulo
     /// libera il posto: conta quel che c'è, non quel che è stato costruito.
-    max_moduli: Option<u32>,
-    contatori: [u32; 6],
+    pub(crate) max_moduli: Option<u32>,
+    contatori: [u32; 11],
     seq: u32,
 }
 
@@ -146,8 +151,8 @@ struct Ghost;
 /// Detrito su una cella (solo campagna). La simulazione non lo vede:
 /// esiste come sprite e come vincolo di piazzamento in `Station::ostacoli`.
 #[derive(Component)]
-struct Ostacolo {
-    cella: IVec2,
+pub(crate) struct Ostacolo {
+    pub(crate) cella: IVec2,
 }
 
 #[derive(Component)]
@@ -217,6 +222,7 @@ fn main() {
         .init_resource::<livelli::StatoLivello>()
         .init_resource::<livelli::LivelloScelto>()
         .init_resource::<livelli::LivelloCasuale>()
+        .init_resource::<mercato::Mercato>()
         .init_resource::<livelli::UltimoPiazzamento>()
         // classifiche e progressione si leggono dal disco una volta
         // all'avvio; file assenti o rotti equivalgono a "nessun dato", senza
@@ -263,7 +269,11 @@ fn main() {
                 input_mouse,
                 ui::click_palette,
                 ui::click_bottone_menu,
+                mercato::toggle_tasto,
+                mercato::click_bottone,
+                mercato::click_offerte,
                 sim::sim_tick.run_if(sim_attiva),
+                applica_gru,
                 // in Infinita/Sfida il codice degli obiettivi non gira proprio
                 livelli::controlla_obiettivo.run_if(livelli::obiettivi_attivi),
                 controlla_fine,
@@ -278,6 +288,7 @@ fn main() {
                 aggiorna_ghost,
                 aggiorna_visuali,
                 orienta_corridoi,
+                mercato::sincronizza,
                 visibilita_scena,
                 ui::visibilita_gioco,
                 ui::update_hud,
@@ -314,6 +325,13 @@ fn carica_art(mut commands: Commands, assets: Res<AssetServer>) {
     let moduli = KINDS.map(|k| assets.load(k.def().sprite));
     commands.insert_resource(Art {
         moduli,
+        ritratti: [
+            assets.load("sprites/ritratti/ingegnere.png"),
+            assets.load("sprites/ritratti/medico.png"),
+            assets.load("sprites/ritratti/caposquadra.png"),
+            assets.load("sprites/ritratti/scienziata.png"),
+            assets.load("sprites/ritratti/comandante.png"),
+        ],
         badge_energia: assets.load("sprites/badge/energia.png"),
         badge_equipaggio: assets.load("sprites/badge/equipaggio.png"),
         badge_avaria: assets.load("sprites/badge/avaria.png"),
@@ -456,6 +474,7 @@ fn input_tastiera(
     tasti: Res<ButtonInput<KeyCode>>,
     pausa: Res<Pausa>,
     sotto: Res<SottoCursore>,
+    progressione: Res<livelli::Progressione>,
     mut sel: ResMut<Selected>,
     mut sim: ResMut<Sim>,
     mut log: ResMut<EventLog>,
@@ -464,16 +483,22 @@ fn input_tastiera(
     if pausa.aperta {
         return;
     }
-    const TASTI: [KeyCode; 6] = [
+    // 1..6 per i moduli base, 7 8 9 0 C per gli sbloccabili
+    const TASTI: [KeyCode; 11] = [
         KeyCode::Digit1,
         KeyCode::Digit2,
         KeyCode::Digit3,
         KeyCode::Digit4,
         KeyCode::Digit5,
         KeyCode::Digit6,
+        KeyCode::Digit7,
+        KeyCode::Digit8,
+        KeyCode::Digit9,
+        KeyCode::Digit0,
+        KeyCode::KeyC,
     ];
     for (i, tasto) in TASTI.iter().enumerate() {
-        if tasti.just_pressed(*tasto) {
+        if tasti.just_pressed(*tasto) && progressione.completati >= KINDS[i].def().sblocco {
             sel.0 = KINDS[i];
         }
     }
@@ -543,6 +568,18 @@ fn input_mouse(
     if sinistro && !station.celle.contains_key(&cella) && !station.ostacoli.contains(&cella) {
         let kind = sel.0;
         let def = kind.def();
+        // il Centro comando coordina gli arrivi di tutta la stazione:
+        // il secondo non avrebbe niente da coordinare
+        if kind == ModuleKind::CentroComando
+            && moduli.iter().any(|m| m.kind == ModuleKind::CentroComando)
+        {
+            log.push(
+                sim.tick,
+                sim::Gravita::Avviso,
+                "Centro comando: massimo uno per stazione",
+            );
+            return;
+        }
         station.contatori[kind.index()] += 1;
         station.seq += 1;
         let numero = station.contatori[kind.index()];
@@ -566,6 +603,8 @@ fn input_mouse(
                     broken: false,
                     staffed: true,
                     collegato: true, // il primo tick (anche in anteprima) lo ricalcola
+                    carica: 0.0,
+                    lavoro: 0,
                 },
                 Scena,
             ))
@@ -838,6 +877,42 @@ fn visibilita_scena(
     }
 }
 
+/// A lavoro compiuto (TICK_LAVORO_GRU tick attivi consecutivi, contati in
+/// sim.rs) la Gru rimuove UN detrito ortogonalmente adiacente e si smonta:
+/// due celle libere al prezzo di un modulo. Senza detriti adiacenti resta
+/// lì a consumare: piazzarla bene è parte del gioco.
+fn applica_gru(
+    mut commands: Commands,
+    mut station: ResMut<Station>,
+    sim: Res<Sim>,
+    mut log: ResMut<EventLog>,
+    moduli: Query<(Entity, &Module)>,
+    ostacoli_q: Query<(Entity, &Ostacolo)>,
+) {
+    for (e, m) in &moduli {
+        if m.kind != ModuleKind::Gru || m.lavoro < TICK_LAVORO_GRU {
+            continue;
+        }
+        let Some(cella_detrito) = [IVec2::X, IVec2::NEG_X, IVec2::Y, IVec2::NEG_Y]
+            .into_iter()
+            .map(|d| m.cella + d)
+            .find(|c| station.ostacoli.contains(c))
+        else {
+            continue;
+        };
+        station.ostacoli.remove(&cella_detrito);
+        if let Some((e_detrito, _)) = ostacoli_q.iter().find(|(_, o)| o.cella == cella_detrito) {
+            commands.entity(e_detrito).despawn();
+        }
+        station.celle.remove(&m.cella);
+        commands.entity(e).despawn();
+        log.info(
+            sim.tick,
+            format!("{}: detrito rimosso, la gru si smonta", m.etichetta),
+        );
+    }
+}
+
 /// Quando la simulazione alza il flag di fine partita, l'app passa alla
 /// schermata "STAZIONE PERSA". Solo in modalità Infinita la partita entra
 /// in classifica (e il file si scrive qui, una volta sola, mai a ogni tick).
@@ -879,6 +954,7 @@ fn applica_reset(
     mut log: ResMut<EventLog>,
     mut sel: ResMut<Selected>,
     mut stato_livello: ResMut<livelli::StatoLivello>,
+    mut offerte: ResMut<mercato::Mercato>,
     modalita: Res<Modalita>,
     casuale: Res<livelli::LivelloCasuale>,
     griglia: Res<Griglia>,
@@ -939,6 +1015,7 @@ fn applica_reset(
         }
         log.info(0, format!("Moduli disponibili: {}", livello.max_moduli));
         log.info(0, "Costruisci e premi Spazio");
+        offerte.rinnova(true, !livello.ostacoli.is_empty());
     } else {
         match *modalita {
             Modalita::Sfida => log.info(
@@ -947,6 +1024,7 @@ fn applica_reset(
             ),
             _ => log.info(0, "Nuova stazione: costruisci e premi Spazio"),
         }
+        offerte.rinnova(false, false);
     }
 }
 

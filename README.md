@@ -23,7 +23,7 @@ una riga malformata si ignora, un file assente vale "nessun dato". I
 corridoi si orientano da soli (dritto, curva, T, incrocio) in base ai
 moduli adiacenti.
 
-Documenti: `SPEC.md` (specifica di design), `GUIDA.md` (guida per chi gioca),
+Documenti: `MANUALE.md` (manuale di gioco illustrato), `SPEC.md` (specifica di design), `GUIDA.md` (guida rapida),
 `POC.md` (la spec della PoC originale, storica), `HANDOFF.md` (stato del lavoro).
 
 ## Download
@@ -54,13 +54,14 @@ il percorso di `assets/` è risolto a runtime.
 
 | Input | Effetto |
 |---|---|
-| `1..6` / click sulla palette | seleziona il modulo (Reattore, Life Support, Dormitorio, Laboratorio, Radiatore, Corridoio) |
+| `1..6`, `7 8 9 0 C` / click sulla palette | seleziona il modulo (i 6 base più i 5 sbloccabili lungo la campagna) |
 | click sinistro | piazza il modulo selezionato sulla cella |
 | click destro | rimuove il modulo sulla cella |
 | `R` | ripara il modulo in avaria sotto il cursore |
 | `Spazio` | avvia/ferma la simulazione (da fermo si costruisce senza conseguenze, l'HUD mostra l'anteprima del bilancio) |
 | `Esc` | apre il menu di pausa e **congela il tick** (è un'altra cosa rispetto a `Spazio`) |
-| frecce + `Invio` | navigano i menu |
+| `M` | apre il mercato interno (facilities una tantum pagate coi punti partita) |
+| frecce + `Invio` | navigano i menu (nella griglia livelli: su/giù riga, sinistra/destra cella) |
 
 Un modulo fermo dice sempre *perché*: velo scuro con fulmine giallo = la sua
 rete non ha energia a sufficienza, fulmine grigio = scollegato (la sua rete
@@ -93,7 +94,7 @@ entrato in top 10.
 
 ## Dove si ritoccano gli sprite
 
-Le mappe ASCII dei 13 sprite (6 moduli 32×32, 3 badge e 4 icone 8×8) stanno in
+Le mappe ASCII degli sprite (11 moduli e un detrito 32×32, 5 ritratti, badge, icone e sfondo) stanno in
 `tools/gen_sprites.py`, una stringa per riga di pixel con la legenda
 carattere → colore nel docstring. Si modifica la mappa e si rigenera:
 
