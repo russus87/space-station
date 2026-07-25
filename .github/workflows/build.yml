@@ -1,0 +1,164 @@
+name: build
+
+"on":
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  # ---------------------------------------------------------------------------
+  # Arch Linux — produces space-station-<ver>-1-x86_64.pkg.tar.zst
+  # ---------------------------------------------------------------------------
+  arch:
+    runs-on: ubuntu-latest
+    container:
+      image: archlinux:latest
+    steps:
+      - name: Install toolchain & deps
+        run: |
+          pacman -Syu --noconfirm --needed \
+            base-devel gcc git rust python sudo \
+            alsa-lib systemd
+          # alsa-lib e systemd (libudev) sono le uniche librerie di sistema
+          # che Bevy richiede in build; il resto (X11/Wayland/Vulkan) è
+          # caricato a runtime.
+
+      - uses: actions/checkout@v4
+
+      - name: Resolve version
+        id: ver
+        run: |
+          if [ "${GITHUB_REF_TYPE}" = "tag" ]; then
+            V="${GITHUB_REF_NAME#v}"
+          else
+            V="$(grep -m1 '^version' Cargo.toml | cut -d'"' -f2)"
+          fi
+          echo "version=$V" >> "$GITHUB_OUTPUT"
+
+      - name: Build binary
+        run: cargo build --release
+
+      - name: Stage package artifacts
+        run: |
+          mkdir -p pkgstage
+          cp target/release/space-station pkgstage/space-station
+          cp packaging/space-station.desktop packaging/PKGBUILD pkgstage/
+          python tools/gen_icon.py pkgstage
+          tar -cf pkgstage/assets.tar assets
+          sed -i "s/^pkgver=.*/pkgver=${{ steps.ver.outputs.version }}/" pkgstage/PKGBUILD
+
+      - name: makepkg (.pkg.tar.zst)
+        run: |
+          useradd -m builder
+          chown -R builder pkgstage
+          cd pkgstage
+          sudo -u builder makepkg -f --noconfirm
+          ls -1 *.pkg.tar.zst
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: arch-package
+          path: pkgstage/*.pkg.tar.zst
+
+      - name: Release
+        if: github.ref_type == 'tag'
+        uses: softprops/action-gh-release@v2
+        with:
+          files: pkgstage/*.pkg.tar.zst
+
+  # ---------------------------------------------------------------------------
+  # Linux — produces space-station-<ver>-linux-x86_64.tar.gz (binario + assets)
+  # ---------------------------------------------------------------------------
+  linux:
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install system deps
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libasound2-dev libudev-dev pkg-config
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - name: Resolve version
+        id: ver
+        run: |
+          if [ "${GITHUB_REF_TYPE}" = "tag" ]; then
+            V="${GITHUB_REF_NAME#v}"
+          else
+            V="$(grep -m1 '^version' Cargo.toml | cut -d'"' -f2)"
+          fi
+          echo "version=$V" >> "$GITHUB_OUTPUT"
+
+      - name: Build binary
+        run: cargo build --release
+
+      - name: Package tar.gz
+        run: |
+          mkdir -p dist/space-station
+          cp target/release/space-station dist/space-station/
+          cp -r assets dist/space-station/
+          cp README.md GUIDA.md dist/space-station/
+          tar -czf "space-station-${{ steps.ver.outputs.version }}-linux-x86_64.tar.gz" \
+            -C dist space-station
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: linux-tarball
+          path: "*.tar.gz"
+
+      - name: Release
+        if: github.ref_type == 'tag'
+        uses: softprops/action-gh-release@v2
+        with:
+          files: "*.tar.gz"
+
+  # ---------------------------------------------------------------------------
+  # Windows — produces space-station-<ver>-windows-x86_64.zip (exe + assets)
+  # ---------------------------------------------------------------------------
+  windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - name: Resolve version
+        id: ver
+        shell: bash
+        run: |
+          if [ "${GITHUB_REF_TYPE}" = "tag" ]; then
+            V="${GITHUB_REF_NAME#v}"
+          else
+            V="$(grep -m1 '^version' Cargo.toml | cut -d'"' -f2)"
+          fi
+          echo "version=$V" >> "$GITHUB_OUTPUT"
+
+      - name: Build binary
+        run: cargo build --release
+
+      - name: Package zip
+        shell: bash
+        run: |
+          mkdir -p dist/space-station
+          cp target/release/space-station.exe dist/space-station/
+          cp -r assets dist/space-station/
+          cp README.md GUIDA.md dist/space-station/
+          cd dist
+          7z a "../space-station-${{ steps.ver.outputs.version }}-windows-x86_64.zip" space-station
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: windows-zip
+          path: "*.zip"
+
+      - name: Release
+        if: github.ref_type == 'tag'
+        uses: softprops/action-gh-release@v2
+        with:
+          files: "*.zip"

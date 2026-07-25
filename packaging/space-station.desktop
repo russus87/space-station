@@ -1,0 +1,8 @@
+[Desktop Entry]
+Type=Application
+Name=Space Station
+Comment=Gestionale di stazione spaziale: bilancio di risorse e cascata di guasti
+Exec=space-station
+Icon=space-station
+Terminal=false
+Categories=Game;Simulation;

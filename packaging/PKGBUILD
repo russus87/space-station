@@ -1,0 +1,35 @@
+# PKGBUILD usato dalla CI (job "arch" di .github/workflows/build.yml):
+# binario, assets, .desktop e icone arrivano già pronti nella cartella di
+# staging, qui si impacchettano soltanto. `pkgver` è riscritto dalla CI.
+pkgname=space-station
+pkgver=0.1.0
+pkgrel=1
+pkgdesc="Gestionale di stazione spaziale: bilancio di risorse e cascata di guasti (Rust + Bevy)"
+arch=('x86_64')
+url="https://github.com/russus87/space-station"
+license=('MIT')
+depends=('alsa-lib' 'vulkan-icd-loader' 'hicolor-icon-theme')
+options=('!strip' '!debug')
+source=('space-station'
+        'assets.tar'
+        'space-station.desktop'
+        'icon-128.png'
+        'icon-256.png'
+        'icon-512.png')
+sha256sums=('SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP')
+
+package() {
+  # binario e assets vivono insieme in /usr/lib/$pkgname: il gioco cerca
+  # `assets/` accanto all'eseguibile reale (percorso_assets in main.rs), e
+  # /proc/self/exe risolve il symlink di /usr/bin
+  install -Dm755 "$srcdir/space-station" "$pkgdir/usr/lib/$pkgname/space-station"
+  cp -r "$srcdir/assets" "$pkgdir/usr/lib/$pkgname/assets"
+  install -d "$pkgdir/usr/bin"
+  ln -s "/usr/lib/$pkgname/space-station" "$pkgdir/usr/bin/space-station"
+  install -Dm644 "$srcdir/space-station.desktop" \
+    "$pkgdir/usr/share/applications/space-station.desktop"
+  for s in 128 256 512; do
+    install -Dm644 "$srcdir/icon-$s.png" \
+      "$pkgdir/usr/share/icons/hicolor/${s}x${s}/apps/space-station.png"
+  done
+}
