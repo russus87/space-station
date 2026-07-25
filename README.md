@@ -24,7 +24,7 @@ corridoi si orientano da soli (dritto, curva, T, incrocio) in base ai
 moduli adiacenti.
 
 Documenti: `MANUALE.md` (manuale di gioco illustrato), `SPEC.md` (specifica di design), `GUIDA.md` (guida rapida),
-`POC.md` (la spec della PoC originale, storica), `HANDOFF.md` (stato del lavoro).
+`POC.md` (la spec della PoC originale, storica), `STORIA.md` (bibbia narrativa).
 
 ## Download
 
