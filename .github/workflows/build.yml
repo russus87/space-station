@@ -22,10 +22,9 @@ jobs:
         run: |
           pacman -Syu --noconfirm --needed \
             base-devel gcc git rust python sudo \
-            alsa-lib systemd
-          # alsa-lib e systemd (libudev) sono le uniche librerie di sistema
-          # che Bevy richiede in build; il resto (X11/Wayland/Vulkan) è
-          # caricato a runtime.
+            alsa-lib systemd wayland libxkbcommon
+          # alsa-lib, systemd (libudev), wayland e libxkbcommon servono in
+          # build (header e .pc); X11 e Vulkan sono caricati a runtime.
 
       - uses: actions/checkout@v4
 
@@ -81,7 +80,9 @@ jobs:
       - name: Install system deps
         run: |
           sudo apt-get update
-          sudo apt-get install -y libasound2-dev libudev-dev pkg-config
+          sudo apt-get install -y \
+            libasound2-dev libudev-dev pkg-config \
+            libwayland-dev libxkbcommon-dev
 
       - uses: dtolnay/rust-toolchain@stable
 
