@@ -22,9 +22,11 @@ jobs:
         run: |
           pacman -Syu --noconfirm --needed \
             base-devel gcc git rust python sudo \
-            alsa-lib systemd wayland libxkbcommon
+            alsa-lib systemd wayland libxkbcommon \
+            vulkan-icd-loader hicolor-icon-theme
           # alsa-lib, systemd (libudev), wayland e libxkbcommon servono in
-          # build (header e .pc); X11 e Vulkan sono caricati a runtime.
+          # build (header e .pc); vulkan-icd-loader e hicolor-icon-theme
+          # solo perché makepkg verifica le depends= del PKGBUILD.
 
       - uses: actions/checkout@v4
 
