@@ -227,7 +227,7 @@ fn main() {
         .insert_resource(livelli::carica_progressione())
         .insert_resource(Sim::default())
         .insert_resource(EventLog::default())
-        .add_systems(Startup, (carica_art, (setup, ui::setup_ui)).chain())
+        .add_systems(Startup, (font_principale, carica_art, (setup, ui::setup_ui)).chain())
         .add_systems(OnEnter(AppState::Titolo), menu::entra_titolo)
         .add_systems(OnExit(AppState::Titolo), menu::esci_titolo)
         .add_systems(OnEnter(AppState::ComeSiGioca), menu::entra_guida)
@@ -294,6 +294,20 @@ fn main() {
 /// tutto, timer del tick compreso.
 fn sim_attiva(pausa: Res<Pausa>) -> bool {
     !pausa.aperta
+}
+
+/// Il font di default di Bevy è un subset ASCII di Fira Mono: «·», «—»,
+/// «→», «º» e le accentate diventavano quadrati. Qui si sostituisce
+/// l'asset al suo stesso id con DejaVu Sans completo (licenza in
+/// `assets/fonts/LICENSE-DejaVu.txt`), incorporato nel binario: nessun
+/// file font da distribuire e nessun `TextFont` da cambiare, tutto il
+/// testo del gioco lo usa automaticamente.
+fn font_principale(mut fonts: ResMut<Assets<Font>>) {
+    const DATI: &[u8] = include_bytes!(concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "/assets/fonts/DejaVuSans.ttf"
+    ));
+    let _ = fonts.insert(AssetId::default(), Font::from_bytes(DATI.to_vec()));
 }
 
 fn carica_art(mut commands: Commands, assets: Res<AssetServer>) {
