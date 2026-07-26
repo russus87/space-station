@@ -1,9 +1,12 @@
 //! Tick di bilancio e cascata di guasti: il cuore della PoC.
-//! Ogni tick: assegnazione equipaggio ai laboratori → reti elettriche per
-//! adiacenza e allocazione energia per priorità dentro ciascuna rete (in
-//! deficit i moduli si spengono a partire dai meno critici) → bilancio
-//! ossigeno → morti/arrivi → bilancio calore → avarie casuali → punteggio e
-//! controllo di fine partita.
+//! Ogni tick: equipaggio a riparazioni (hanno la precedenza) e laboratori →
+//! reti elettriche per adiacenza e allocazione energia per priorità dentro
+//! ciascuna rete (in deficit i moduli si spengono a partire dai meno
+//! critici) → bilancio ossigeno → morti/arrivi → bilancio calore → avarie
+//! casuali → punteggio e controllo di fine partita.
+//! I tratti della squadra schierata (`squadra.rs`) piegano i numeri senza
+//! aggiungere regole; senza nessuno a bordo plancia i default sono identici
+//! al gioco di sempre.
 //! In pausa si ricalcola solo l'allocazione (anteprima del bilancio nell'HUD),
 //! senza consumare ossigeno né rompere nulla: si costruisce senza conseguenze.
 
@@ -22,6 +25,8 @@ pub const TICK_ARRIVO: u32 = 4; // con posti liberi e aria buona, un arrivo ogni
 pub const CAPIENZA_BATTERIA: f32 = 250.0; // energia immagazzinabile per batteria
 pub const RICARICA_BATTERIA: f32 = 25.0; // carica massima per tick, dal surplus di rete
 pub const TICK_LAVORO_GRU: u32 = 12; // tick attivi consecutivi per rimuovere un detrito
+pub const TICK_RIPARAZIONE: u32 = 8; // tick di lavoro per riparare un'avaria
+pub const EQUIPAGGIO_RIPARAZIONE: u32 = 2; // persone impegnate da ogni riparazione
 /// Tetto di sicurezza: oltre questo tick la partita finisce comunque, vinta o
 /// no. Senza, una stazione bloccata in una spirale di asfissia lenta (morti
 /// a un membro ogni `TICK_MORTE` tick) può trascinarsi per centinaia di tick
@@ -43,12 +48,22 @@ pub struct Module {
     /// Tick attivi consecutivi (solo Gru): a TICK_LAVORO_GRU scatta la
     /// rimozione del detrito adiacente (effetto spaziale in main.rs).
     pub lavoro: u32,
+    /// Tick di riparazione mancanti (0 = nessuna in corso). Finché è > 0
+    /// il modulo resta in avaria e impegna EQUIPAGGIO_RIPARAZIONE persone;
+    /// se l'equipaggio non basta la riparazione si sospende (il contatore
+    /// non avanza) finché qualcuno torna disponibile.
+    pub riparazione: u32,
 }
 
 impl Module {
     /// La definizione di "attivo" della simulazione, in un solo posto.
     pub fn attivo(&self) -> bool {
         self.powered && !self.broken
+    }
+
+    /// C'è una squadra al lavoro su questo modulo? (Per UI e ispezione.)
+    pub fn in_riparazione(&self) -> bool {
+        self.riparazione > 0
     }
 
     /// Perché il modulo è fermo; `None` se sta lavorando.
@@ -114,6 +129,10 @@ pub struct Sim {
     pub calore_netto: f32,
     pub posti_letto: u32,
     pub lab_fabbisogno: u32, // equipaggio richiesto dai laboratori non rotti
+    /// Persone occupate ADESSO: riparazioni servite × EQUIPAGGIO_RIPARAZIONE
+    /// più l'equipaggio assegnato ai laboratori. Solo output (HUD e tasto R:
+    /// vedi `equipaggio_libero`).
+    pub equipaggio_impegnato: u32,
     /// Avarie da surriscaldamento dall'inizio della partita: contatore di
     /// eventi, solo output. Lo legge l'obiettivo del livello "Termica"
     /// (`livelli.rs`) per accorgersi di una nuova avaria senza tenere stato
@@ -169,6 +188,7 @@ impl Default for Sim {
             calore_netto: 0.0,
             posti_letto: 0,
             lab_fabbisogno: 0,
+            equipaggio_impegnato: 0,
             avarie_surriscaldamento: 0,
             punteggio: 0,
             equipaggio_max: 0,
@@ -254,6 +274,12 @@ pub fn tasto_velocita(
     log.info(tick, format!("Velocità ×{velocita}"));
 }
 
+/// Quante persone NON sono impegnate in riparazioni o laboratori: è il
+/// budget umano per avviare una nuova riparazione (tasto R in main.rs).
+pub fn equipaggio_libero(sim: &Sim) -> u32 {
+    sim.equipaggio.saturating_sub(sim.equipaggio_impegnato)
+}
+
 /// Quanto una rete attinge dalle batterie e quanto surplus resta per
 /// ricaricarle, dati l'accumulo iniziale offerto dalle batterie e il
 /// residuo del pool dopo la distribuzione. Pura, testata.
@@ -281,6 +307,7 @@ pub fn sim_tick(
     time: Res<Time>,
     mut sim: ResMut<Sim>,
     mut log: ResMut<EventLog>,
+    squadra: Res<crate::squadra::Squadra>,
     mut q: Query<&mut Module>,
 ) {
     // A stazione persa la simulazione si ferma: la schermata di fine partita
@@ -309,8 +336,43 @@ pub fn sim_tick(
     let mut mods: Vec<Mut<Module>> = q.iter_mut().collect();
     mods.sort_by_key(|m| (m.kind.def().priorita, m.seq));
 
-    // --- 1) equipaggio nei laboratori (ordine di costruzione) ---
+    // --- 1) equipaggio: prima le riparazioni, poi i laboratori ---
+    // Le riparazioni hanno la precedenza sull'equipaggio (una squadra al
+    // lavoro non si sposta in laboratorio): si servono in ordine di avvio
+    // (seq del modulo), e quelle che non trovano braccia si SOSPENDONO —
+    // il contatore non avanza, nessuno muore di straordinari.
     let mut disponibili = sim.equipaggio;
+    let mut servite = 0u32;
+    // se qualcosa ha già riparato il modulo (la scorta "Squadra di
+    // riparazione"), il cantiere si smonta da solo: niente braccia
+    // impegnate su un modulo sano
+    for m in mods.iter_mut() {
+        if m.riparazione > 0 && !m.broken {
+            m.riparazione = 0;
+        }
+    }
+    let mut in_riparazione: Vec<usize> = mods
+        .iter()
+        .enumerate()
+        .filter(|(_, m)| m.riparazione > 0)
+        .map(|(i, _)| i)
+        .collect();
+    in_riparazione.sort_by_key(|&i| mods[i].seq);
+    for i in in_riparazione {
+        if disponibili < EQUIPAGGIO_RIPARAZIONE {
+            continue; // sospesa: riprenderà quando l'equipaggio torna
+        }
+        disponibili -= EQUIPAGGIO_RIPARAZIONE;
+        servite += 1;
+        if vivo {
+            let m = &mut mods[i];
+            m.riparazione -= 1;
+            if m.riparazione == 0 {
+                m.broken = false;
+                log.info(tick, format!("{}: riparazione completata", m.etichetta));
+            }
+        }
+    }
     for m in mods.iter_mut() {
         if m.kind != ModuleKind::Laboratorio || m.broken {
             continue;
@@ -338,6 +400,12 @@ pub fn sim_tick(
         .filter(|m| m.kind == ModuleKind::Laboratorio && !m.broken)
         .map(|m| m.kind.def().equipaggio_richiesto)
         .sum();
+    sim.equipaggio_impegnato = servite * EQUIPAGGIO_RIPARAZIONE
+        + mods
+            .iter()
+            .filter(|m| m.kind == ModuleKind::Laboratorio && !m.broken && m.staffed)
+            .map(|m| m.kind.def().equipaggio_richiesto)
+            .sum::<u32>();
 
     // --- 2) reti elettriche e allocazione per priorità (cascata stadio 1) ---
     // L'energia viaggia solo nei CONDUTTORI — reattori e corridoi — su celle
@@ -409,6 +477,17 @@ pub fn sim_tick(
     for c in 0..n_comp {
         pool[c] += accumulo[c];
     }
+    // Il consumo "vero" di un modulo: quello di tabella, piegato dai tratti
+    // della squadra (Mira alleggerisce i laboratori). Usarlo OVUNQUE il
+    // consumo conti — allocazione e totale HUD — o i due divergono.
+    let energia_di = |m: &Module| {
+        let e = m.kind.def().energia;
+        if m.kind == ModuleKind::Laboratorio {
+            e * squadra.energia_lab()
+        } else {
+            e
+        }
+    };
     let mut blackout = false;
     for (i, m) in mods.iter_mut().enumerate() {
         let def = m.kind.def();
@@ -452,9 +531,10 @@ pub fn sim_tick(
             m.powered = true;
             continue;
         }
+        let consumo = energia_di(m);
         let rete = &mut pool[comp[i]];
-        if *rete + def.energia >= 0.0 {
-            *rete += def.energia;
+        if *rete + consumo >= 0.0 {
+            *rete += consumo;
             // il ricollegamento è già loggato sopra: niente doppia riga
             if vivo && !m.powered && era_collegato {
                 log.info(tick, format!("{} riavviato", m.etichetta));
@@ -480,7 +560,7 @@ pub fn sim_tick(
     sim.energia_cons = mods
         .iter()
         .filter(|m| m.powered && !m.broken && m.kind.def().energia < 0.0)
-        .map(|m| -m.kind.def().energia)
+        .map(|m| -energia_di(m))
         .sum();
     // Regolamento batterie, per rete: quanto è stato attinto (accumulo −
     // residuo, se positivo) si scala dalle cariche in ordine di costruzione;
@@ -541,7 +621,15 @@ pub fn sim_tick(
     sim.calore_prod = mods
         .iter()
         .filter(|m| attivo(m) && m.kind.def().calore > 0.0)
-        .map(|m| m.kind.def().calore)
+        .map(|m| {
+            let calore = m.kind.def().calore;
+            // Vera raffredda i reattori: il tratto piega solo loro
+            if m.kind == ModuleKind::Reattore {
+                calore * squadra.calore_reattore()
+            } else {
+                calore
+            }
+        })
         .sum();
     sim.calore_diss = mods
         .iter()
@@ -573,7 +661,8 @@ pub fn sim_tick(
     // --- 4) equipaggio: asfissia (cascata stadio 3) e nuovi arrivi ---
     if sim.ossigeno <= 0.0 && sim.equipaggio > 0 {
         sim.cd_morte += 1;
-        if sim.cd_morte >= TICK_MORTE {
+        // Tomas raddoppia il respiro tra due asfissie
+        if sim.cd_morte >= squadra.tick_morte() {
             sim.cd_morte = 0;
             let prima = sim.equipaggio;
             sim.equipaggio -= 1;
@@ -586,14 +675,16 @@ pub fn sim_tick(
     } else {
         sim.cd_morte = 0;
     }
-    // il Centro comando attivo dimezza l'attesa dei nuovi arrivi
+    // la cadenza base la piega Dario (4 → 3), il Centro comando attivo la
+    // dimezza DOPO — i due bonus si compongono, mai sotto un tick
+    let base_arrivo = squadra.tick_arrivo();
     let cadenza_arrivo = if mods
         .iter()
         .any(|m| m.kind == ModuleKind::CentroComando && m.attivo())
     {
-        TICK_ARRIVO / 2
+        (base_arrivo / 2).max(1)
     } else {
-        TICK_ARRIVO
+        base_arrivo
     };
     if sim.equipaggio < sim.posti_letto && sim.ossigeno > 50.0 {
         sim.cd_arrivo += 1;
@@ -728,6 +819,7 @@ mod test {
             collegato: true,
             carica: 0.0,
             lavoro: 0,
+            riparazione: 0,
         }
     }
 
@@ -738,12 +830,20 @@ mod test {
         world.insert_resource(sim);
         world.insert_resource(EventLog::default());
         world.insert_resource(Time::<()>::default());
+        world.insert_resource(crate::squadra::Squadra::default());
         for m in moduli {
             world.spawn(m);
         }
         let mut schedule = Schedule::default();
         schedule.add_systems(sim_tick);
         (world, schedule)
+    }
+
+    fn schiera(world: &mut World, personaggio: usize) {
+        world
+            .resource_mut::<crate::squadra::Squadra>()
+            .schierati
+            .push(personaggio);
     }
 
     fn un_tick(world: &mut World, schedule: &mut Schedule) {
@@ -859,5 +959,110 @@ mod test {
         let mut q = world.query::<&Module>();
         let ls = q.iter(&world).find(|m| m.kind == ModuleKind::LifeSupport).unwrap();
         assert!(ls.collegato && ls.powered, "il corridoio doveva portare la corrente");
+    }
+
+    // --- riparazioni con costo ---
+
+    /// Reattore + life support (l'aria regge) + un radiatore rotto in
+    /// riparazione; l'equipaggio lo mette il chiamante.
+    fn mondo_riparazione(equipaggio: u32) -> (World, Schedule) {
+        let mut rotto = modulo(ModuleKind::Radiatore, 1, 5);
+        rotto.broken = true;
+        rotto.riparazione = TICK_RIPARAZIONE;
+        let moduli = vec![
+            modulo(ModuleKind::Reattore, 0, 0),
+            modulo_xy(ModuleKind::LifeSupport, 0, 1, 1),
+            rotto,
+        ];
+        let (mut world, schedule) = mondo_con(moduli);
+        world.resource_mut::<Sim>().equipaggio = equipaggio;
+        (world, schedule)
+    }
+
+    #[test]
+    fn la_riparazione_impegna_due_persone_e_completa_all_ottavo_tick() {
+        let (mut world, mut schedule) = mondo_riparazione(3);
+        for t in 1..=TICK_RIPARAZIONE {
+            un_tick(&mut world, &mut schedule);
+            let sim = world.resource::<Sim>();
+            assert_eq!(
+                sim.equipaggio_impegnato, EQUIPAGGIO_RIPARAZIONE,
+                "al tick {t} la squadra doveva essere al lavoro"
+            );
+            let mut q = world.query::<&Module>();
+            let rotto = q.iter(&world).find(|m| m.kind == ModuleKind::Radiatore).unwrap();
+            assert_eq!(rotto.broken, t < TICK_RIPARAZIONE, "tick {t}");
+        }
+        // il tick dopo la squadra è libera
+        un_tick(&mut world, &mut schedule);
+        assert_eq!(world.resource::<Sim>().equipaggio_impegnato, 0);
+    }
+
+    #[test]
+    fn senza_equipaggio_libero_la_riparazione_si_sospende() {
+        let (mut world, mut schedule) = mondo_riparazione(2);
+        un_tick(&mut world, &mut schedule);
+        un_tick(&mut world, &mut schedule);
+        // due tick di lavoro fatti, poi resta una persona sola: sospesa
+        world.resource_mut::<Sim>().equipaggio = 1;
+        un_tick(&mut world, &mut schedule);
+        un_tick(&mut world, &mut schedule);
+        let mut q = world.query::<&Module>();
+        let rotto = q.iter(&world).find(|m| m.kind == ModuleKind::Radiatore).unwrap();
+        assert_eq!(
+            rotto.riparazione,
+            TICK_RIPARAZIONE - 2,
+            "sospesa: il contatore non doveva avanzare"
+        );
+        assert!(rotto.broken);
+        assert_eq!(world.resource::<Sim>().equipaggio_impegnato, 0);
+        // tornano le braccia: si riprende da dove si era
+        world.resource_mut::<Sim>().equipaggio = 2;
+        for _ in 0..TICK_RIPARAZIONE - 2 {
+            un_tick(&mut world, &mut schedule);
+        }
+        let mut q = world.query::<&Module>();
+        let riparato = q.iter(&world).find(|m| m.kind == ModuleKind::Radiatore).unwrap();
+        assert!(!riparato.broken);
+    }
+
+    // --- tratti della squadra ---
+
+    #[test]
+    fn vera_riduce_il_calore_dei_reattori_di_un_quarto() {
+        let (mut world, mut schedule) = mondo_con(vec![modulo(ModuleKind::Reattore, 0, 0)]);
+        schiera(&mut world, 0);
+        un_tick(&mut world, &mut schedule);
+        assert_eq!(world.resource::<Sim>().calore_prod, 30.0);
+    }
+
+    #[test]
+    fn mira_fa_entrare_il_laboratorio_dove_la_corrente_non_bastava() {
+        // 2 life support (60) + corridoio (1) + lab (40) = 101 > 100: senza
+        // Mira il lab resta al buio; col suo tratto consuma 30 ed entra
+        let costruisci = || {
+            vec![
+                modulo(ModuleKind::Reattore, 0, 0),
+                modulo_xy(ModuleKind::LifeSupport, -1, 0, 1),
+                modulo_xy(ModuleKind::LifeSupport, 0, 1, 2),
+                modulo(ModuleKind::Corridoio, 1, 3),
+                modulo(ModuleKind::Laboratorio, 2, 4),
+            ]
+        };
+        let (mut world, mut schedule) = mondo_con(costruisci());
+        world.resource_mut::<Sim>().equipaggio = 2;
+        un_tick(&mut world, &mut schedule);
+        let mut q = world.query::<&Module>();
+        let lab = q.iter(&world).find(|m| m.kind == ModuleKind::Laboratorio).unwrap();
+        assert!(!lab.powered, "senza Mira il lab non doveva entrare");
+
+        let (mut world, mut schedule) = mondo_con(costruisci());
+        world.resource_mut::<Sim>().equipaggio = 2;
+        schiera(&mut world, 3);
+        un_tick(&mut world, &mut schedule);
+        let mut q = world.query::<&Module>();
+        let lab = q.iter(&world).find(|m| m.kind == ModuleKind::Laboratorio).unwrap();
+        assert!(lab.powered, "con Mira il lab doveva entrare");
+        assert!(!world.resource::<Sim>().in_blackout);
     }
 }

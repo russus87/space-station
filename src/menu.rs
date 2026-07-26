@@ -8,7 +8,7 @@ use crate::generatore;
 use crate::impostazioni::{Impostazioni, ciclo};
 use crate::livelli::{
     ClassificaInfinita, ClassificaSfida, LIVELLI, LivelloCasuale, LivelloScelto, Modalita,
-    Progressione, Record, UltimoPiazzamento, giorni_fa,
+    Progressione, Record, SfidaDelGiorno, UltimoPiazzamento, giorni_fa, giorno_corrente,
 };
 use crate::mercato::FACILITIES;
 use crate::progressi::Portafoglio;
@@ -91,6 +91,9 @@ pub enum Azione {
     GiocaSfida,
     /// Genera un livello con seed casuale e lo gioca (fuori progressione).
     GiocaCasuale,
+    /// La sfida del giorno: stesso livello per tutti oggi, miglior tempo
+    /// personale registrato. Fuori da classifiche e progressione.
+    GiocaGiornaliera,
     ApriClassifica,
     ApriMarketplace,
     /// Compra la facility `i` del catalogo, se i crediti bastano.
@@ -272,6 +275,13 @@ fn fumetto(p: &mut ChildSpawnerCommands, art: &Art, personaggio: usize, battuta:
     });
 }
 
+/// Tick di simulazione in tempo reale "m:ss" (gemello del helper privato
+/// di prologo.rs: entrambi piccoli, nessuna casa comune che li meriti).
+fn tick_in_tempo_menu(tick: u64) -> String {
+    let secondi = (tick as f32 * TICK_SECS) as u64;
+    format!("{}:{:02}", secondi / 60, secondi % 60)
+}
+
 fn radice_centrata() -> Node {
     Node {
         position_type: PositionType::Absolute,
@@ -287,16 +297,21 @@ fn radice_centrata() -> Node {
 
 // ---------------- Titolo ----------------
 
-pub fn entra_titolo(mut commands: Commands, mut sel: ResMut<Selezione>) {
+pub fn entra_titolo(
+    mut commands: Commands,
+    portafoglio: Res<Portafoglio>,
+    mut sel: ResMut<Selezione>,
+) {
     *sel = Selezione {
         idx: 0,
-        n: 8,
+        n: 9,
         conferma: None,
     };
     commands
         .spawn((
             radice_centrata(),
-            BackgroundColor(NERO),
+            // semitrasparente: dietro vive l'attract mode (attract.rs)
+            BackgroundColor(NERO.with_alpha(0.82)),
             GlobalZIndex(10),
             SchermataTitolo,
         ))
@@ -319,10 +334,11 @@ pub fn entra_titolo(mut commands: Commands, mut sel: ResMut<Selezione>) {
             voce(r, 1, Azione::GiocaInfinita, "Infinita");
             voce(r, 2, Azione::GiocaSfida, "Sfida");
             voce(r, 3, Azione::GiocaCasuale, "Livello casuale");
-            voce(r, 4, Azione::ApriMarketplace, "Marketplace");
-            voce(r, 5, Azione::ApriClassifica, "Classifica");
-            voce(r, 6, Azione::ComeSiGioca, "Come si gioca");
-            voce(r, 7, Azione::Esci, "Esci");
+            voce(r, 4, Azione::GiocaGiornaliera, etichetta_giornaliera(&portafoglio));
+            voce(r, 5, Azione::ApriMarketplace, "Marketplace");
+            voce(r, 6, Azione::ApriClassifica, "Classifica");
+            voce(r, 7, Azione::ComeSiGioca, "Come si gioca");
+            voce(r, 8, Azione::Esci, "Esci");
         });
 }
 
@@ -504,7 +520,7 @@ pub fn entra_guida(
 
             for riga in [
                 "1-6 e 7 8 9 0 C  scegli il modulo          click sinistro  piazza",
-                "click destro  rimuove          R  ripara un modulo in avaria",
+                "click destro  rimuove          R  ripara (2 di equipaggio per 8 tick)",
                 "Spazio  avvia/ferma          V  velocita'          F12  screenshot",
                 "Esc  apre il menu (volumi compresi) e congela tutto",
                 "Finisci i livelli in fretta: le medaglie fruttano crediti per il Marketplace",
@@ -993,6 +1009,7 @@ pub struct SchermataCompletato;
 /// Obiettivo raggiunto: punteggio e tick della partita, e la strada avanti.
 /// All'ultimo livello di campagna la voce "Livello successivo" non esiste;
 /// nel livello casuale al suo posto c'è "Nuovo livello casuale".
+#[allow(clippy::too_many_arguments)]
 pub fn entra_completato(
     mut commands: Commands,
     sim: Res<Sim>,
@@ -1000,6 +1017,8 @@ pub fn entra_completato(
     casuale: Res<LivelloCasuale>,
     art: Res<Art>,
     medaglia: Res<crate::livelli::UltimaMedaglia>,
+    bonus: Res<crate::livelli::UltimoBonus>,
+    giornaliera: Res<crate::livelli::UltimaGiornaliera>,
     mut sel: ResMut<Selezione>,
 ) {
     let in_casuale = matches!(*modalita, Modalita::Casuale);
@@ -1114,6 +1133,65 @@ pub fn entra_completato(
                     }
                 }
             });
+            // l'esito del bonus (solo campagna): il credito extra si vede
+            // qui, dove si tirano le somme
+            if let Some((quale, rispettato, nuovo)) = bonus.0 {
+                let (riga, colore) = if nuovo {
+                    (
+                        format!("BONUS \u{2713} {} — +1 credito", quale.descrizione()),
+                        VERDE,
+                    )
+                } else if rispettato {
+                    (
+                        format!("Bonus rispettato ({}) — già incassato", quale.descrizione()),
+                        METALLO,
+                    )
+                } else {
+                    (
+                        format!("Bonus mancato: {}", quale.descrizione()),
+                        GRIGIO_MEDIO,
+                    )
+                };
+                r.spawn((Node {
+                    margin: UiRect::bottom(Val::Px(8.0)),
+                    ..default()
+                },))
+                .with_children(|c| {
+                    c.spawn(testo(riga, 14.0, colore));
+                });
+            }
+            // l'esito della sfida del giorno: il record è la sua classifica
+            if let Some((tick_run, migliore, record)) = giornaliera.0 {
+                r.spawn((Node {
+                    margin: UiRect::bottom(Val::Px(8.0)),
+                    flex_direction: FlexDirection::Column,
+                    align_items: AlignItems::Center,
+                    row_gap: Val::Px(2.0),
+                    ..default()
+                },))
+                .with_children(|c| {
+                    if record {
+                        c.spawn(testo(
+                            format!(
+                                "NUOVO RECORD DI OGGI: {}",
+                                tick_in_tempo_menu(tick_run)
+                            ),
+                            15.0,
+                            GIALLO,
+                        ));
+                    } else {
+                        c.spawn(testo(
+                            format!(
+                                "Tempo: {} — il tuo migliore di oggi resta {}",
+                                tick_in_tempo_menu(tick_run),
+                                tick_in_tempo_menu(migliore)
+                            ),
+                            14.0,
+                            METALLO,
+                        ));
+                    }
+                });
+            }
             // ai traguardi della campagna il personaggio di turno presenta
             // il modulo appena sbloccato (comparirà nella palette)
             if let Modalita::Campagna(i) = *modalita
@@ -1339,6 +1417,7 @@ pub fn naviga(
     mut scelto: ResMut<LivelloScelto>,
     mut casuale: ResMut<LivelloCasuale>,
     progressione: Res<Progressione>,
+    mut sfida: ResMut<SfidaDelGiorno>,
     mut imp: ResMut<Impostazioni>,
     mut portafoglio: ResMut<Portafoglio>,
     stato: Res<State<AppState>>,
@@ -1420,6 +1499,7 @@ pub fn naviga(
                 &mut modalita,
                 &mut scelto,
                 &mut casuale,
+                &mut sfida,
                 &progressione,
                 &mut imp,
                 &mut portafoglio,
@@ -1442,6 +1522,7 @@ pub fn click_voci(
     mut scelto: ResMut<LivelloScelto>,
     mut casuale: ResMut<LivelloCasuale>,
     progressione: Res<Progressione>,
+    mut sfida: ResMut<SfidaDelGiorno>,
     mut imp: ResMut<Impostazioni>,
     mut portafoglio: ResMut<Portafoglio>,
     stato: Res<State<AppState>>,
@@ -1469,6 +1550,7 @@ pub fn click_voci(
                     &mut modalita,
                     &mut scelto,
                     &mut casuale,
+                    &mut sfida,
                     &progressione,
                     &mut imp,
                     &mut portafoglio,
@@ -1493,6 +1575,7 @@ fn esegui(
     modalita: &mut Modalita,
     scelto: &mut LivelloScelto,
     casuale: &mut LivelloCasuale,
+    sfida: &mut SfidaDelGiorno,
     progressione: &Progressione,
     imp: &mut Impostazioni,
     portafoglio: &mut Portafoglio,
@@ -1525,6 +1608,21 @@ fn esegui(
             // il seed viene dal rand di sistema: qui la non-riproducibilità
             // è il punto; la campagna invece usa seed fissi (generatore.rs)
             casuale.0 = Some(generatore::genera_casuale(rand::rng().random::<u64>()));
+            sfida.attiva = false;
+            *modalita = Modalita::Casuale;
+            reset.0 = true;
+            pausa.aperta = false;
+            prossimo.set(AppState::InGioco);
+        }
+        Azione::GiocaGiornaliera => {
+            // stesso seed per tutti nel giorno: il confronto è col mondo
+            // (e con se stessi: si rigioca per il miglior tempo)
+            let giorno = giorno_corrente();
+            casuale.0 = Some(generatore::genera_giornaliera(giorno));
+            *sfida = SfidaDelGiorno {
+                attiva: true,
+                giorno,
+            };
             *modalita = Modalita::Casuale;
             reset.0 = true;
             pausa.aperta = false;
@@ -1643,6 +1741,32 @@ pub fn anima_monete(
 /// Tiene aggiornate le etichette dei volumi nel menu di pausa: si scrive
 /// `Voce.etichetta` (non il testo) perché `evidenzia_voci` la ricopia a
 /// ogni frame.
+/// Etichetta della voce "Sfida del giorno": la spunta dice che il record
+/// di oggi è già in cascina (si può sempre rigiocare per migliorarlo).
+fn etichetta_giornaliera(portafoglio: &Portafoglio) -> String {
+    if portafoglio.giornaliera_fatta(giorno_corrente()) {
+        "Sfida del giorno ✓".into()
+    } else {
+        "Sfida del giorno".into()
+    }
+}
+
+/// Tiene aggiornata la spunta della sfida del giorno quando il portafoglio
+/// cambia (completamento della sfida mentre il titolo è ancora vivo).
+pub fn aggiorna_voce_giornaliera(
+    portafoglio: Res<Portafoglio>,
+    mut voci: Query<&mut Voce>,
+) {
+    if !portafoglio.is_changed() {
+        return;
+    }
+    for mut v in &mut voci {
+        if v.azione == Azione::GiocaGiornaliera {
+            v.etichetta = etichetta_giornaliera(&portafoglio);
+        }
+    }
+}
+
 pub fn aggiorna_voci_volume(imp: Res<Impostazioni>, mut voci: Query<&mut Voce>) {
     if !imp.is_changed() {
         return;

@@ -1,6 +1,6 @@
 # SPACE STATION — Manuale di gioco
 
-*Manuale operativo di bordo, edizione v0.7 — da leggere prima del primo
+*Manuale operativo di bordo, edizione v0.8 — da leggere prima del primo
 turno in cabina di comando. O durante. Nessuno ti giudica.*
 
 ---
@@ -141,6 +141,8 @@ un'istruzione — e sotto l'istruzione, quasi sempre, un ricordo.
 
 ### <img src="docs/img/ingegnere.png" width="96"><br>Vera — Ingegnera di bordo
 
+**In plancia (dal liv. 10).** Il calore dei reattori scende del 25%.
+
 **Passato.** Dieci anni fa era di turno in una sala macchine di cui non
 parla mai direttamente — e di cui parla sempre, se fai caso a come
 tratta il calore. Nessuno le ha mai dato una colpa; lei non ha mai
@@ -158,6 +160,8 @@ progetto riabilitativo.
 
 ### <img src="docs/img/medico.png" width="96"><br>Tomas — Medico di stazione
 
+**In plancia (dal liv. 20).** Asfissia dimezzata: un morto ogni 6 tick invece di 3.
+
 **Passato.** Ha tenuto un registro, una volta, in cui i conti non
 tornavano più: da allora conta tutto — respiri, letti, arrivi — come se
 contare fosse una forma di preghiera.
@@ -171,6 +175,8 @@ consegna la **Serra** al livello 15 — la chiama "prescrizione verde".
 > «Gli incidenti capitano. Quello che conta è chi respira dopo.»
 
 ### <img src="docs/img/caposquadra.png" width="96"><br>Dario — Caposquadra
+
+**In plancia (dal liv. 30).** Arrivi più rapidi: uno ogni 3 tick invece di 4.
 
 **Passato.** Sei anni di turni su una stazione che oggi non c'è più:
 conosce quelle rocce là fuori molto meglio di quanto ammetta, e per
@@ -188,6 +194,8 @@ letteralmente e no.
 
 ### <img src="docs/img/scienziata.png" width="96"><br>Mira — Scienziata capo
 
+**In plancia (dal liv. 40).** I laboratori consumano il 25% di energia in meno.
+
 **Passato.** Ufficialmente è a bordo per i laboratori. In realtà
 cataloga i frammenti là fuori con un'attenzione che alle rocce non
 servirebbe — e per metà campagna tiene per sé quello che va scoprendo.
@@ -202,6 +210,8 @@ e cambia il modo in cui guarderai il punteggio.
 > se costassero. Costano.»
 
 ### <img src="docs/img/comandante.png" width="96"><br>Ilse — Comandante
+
+**In plancia (dal liv. 50).** Comando doppio: con lei si schierano in due.
 
 **Passato.** C'è chi la chiama ancora "quella che ha perso una
 stazione". Lei non corregge nessuno: sa contare meglio di tutti quello
@@ -228,6 +238,7 @@ casa.»*
 | **Infinita** | nessuno: resisti | nessuno | top 10 Infinita |
 | **Sfida** | nessuno: punti entro il tempo | 400 | top 10 Sfida |
 | **Livello casuale** | uno generato al momento | 400 | no |
+| **Sfida del giorno** | lo stesso per tutti, dalla data | 400 | no (miglior tempo del giorno, locale) |
 
 Il **punteggio** è persone·tick: a ogni tick guadagni tanti punti quante
 persone respirano a bordo. Infinita e Sfida hanno classifiche separate
@@ -235,13 +246,21 @@ apposta: senza tetto di tick, l'Infinita vincerebbe sempre solo durando.
 
 Tutto si salva in file di testo semplici in
 `~/.local/share/space-station/` (o `$XDG_DATA_HOME/space-station/`):
-`classifica.txt`, `classifica_sfida.txt`, `progressione.txt`. Cancellarli
+`classifica.txt`, `classifica_sfida.txt`, `progressione.txt`, `progressi.txt` (medaglie, crediti, scorte, bonus e record del giorno). Cancellarli
 azzera solo quello che contengono, niente di peggio.
 
 ### La campagna in breve
 
 Cinquanta livelli: i primi 6 disegnati a mano (uno per meccanismo), dal 7
 in poi generati con seed fisso — il livello 23 è il livello 23 per tutti.
+Ogni livello porta anche un **obiettivo bonus** opzionale, scritto
+nell'HUD accanto a quello principale: *senza demolire moduli*, *senza
+usare scorte*, *sotto budget*, *ossigeno mai sotto 50*. Rispettarlo vale
+**+1 credito**, una volta sola per livello; violarlo non costa niente —
+il bonus si perde e basta, la partita continua. E dal prologo scegli
+**chi portare in plancia**: i cinque si sbloccano ai traguardi
+10/20/30/40/50, ognuno piega un numero del gioco a tuo favore (le schede
+al capitolo 3). Ilse, da comandante, apre un secondo posto.
 Ogni livello ha un obiettivo, spesso dei detriti, e un **budget di
 moduli** (corridoi inclusi) mostrato nel prologo e nell'HUD: a budget
 esaurito si rimuove col tasto destro e si riorganizza. Ogni dieci livelli,
@@ -326,7 +345,28 @@ agguati.
 
 ---
 
-## 7. Comandi
+## 7. Gli eventi: i bivi del comando
+
+Una o due volte a partita (mai prima del tick 60, mai durante un
+imprevisto, in campagna dal livello 8) la stazione si ferma davvero: uno
+dei cinque ti porta un **bivio**. La simulazione si congela, il
+personaggio espone la situazione, e sotto le due scelte ci sono le
+conseguenze **scritte per esteso** — questo gioco non fa sorprese sui
+contratti, solo sulle meteore. Si sceglie col click o coi tasti `1`/`2`;
+le opzioni impossibili (comprare senza punti, scaricare batterie che non
+hai) sono spente col motivo.
+
+I cinque bivi in circolazione: la **nave in avaria** che chiede attracco
+(equipaggio extra oltre i posti, o punti per il rigore), il **mercante di
+passaggio** (ossigeno in cambio di punti), lo **sciame in rotta** (svuota
+le batterie per deviarlo, o rischia), gli **straordinari** del centro
+(punti in cambio di calore) e il **clandestino** (un paio di braccia in
+più, o un credito per la consegna). Ogni evento capita al massimo una
+volta per partita.
+
+---
+
+## 8. Comandi
 
 | Input | Effetto |
 |---|---|
@@ -335,17 +375,18 @@ agguati.
 | click sulla palette | come i tasti |
 | click sinistro | costruisce sulla cella |
 | click destro | rimuove il modulo sulla cella |
-| `R` | ripara il modulo in avaria sotto il cursore |
+| `R` | avvia la riparazione del modulo in avaria sotto il cursore: **2 di equipaggio per 8 tick** (sospesa se mancano braccia; l'ispezione conta i tick) |
 | `Spazio` | avvia/ferma la simulazione (da fermi si costruisce senza conseguenze, l'HUD mostra l'anteprima) |
 | `V` | velocità di gioco: ×1 → ×2 → ×4 (stessi tick, più rapidi; l'HUD lo mostra accanto al timer; torna a ×1 a ogni partita) |
 | `Esc` | menu di pausa (congela anche il tempo) — anche col bottone MENU nell'HUD |
+| `1` / `2` | scelgono l'opzione quando un evento apre il bivio |
 | `F12` | salva uno screenshot nella cartella corrente |
 | frecce + `Invio` | navigano i menu (`Invio`/`Backspace` avanzano e arretrano anche il prologo) |
 | frecce nella griglia livelli | su/giù cambia riga, sinistra/destra cella |
 
 ---
 
-## 8. L'audio
+## 9. L'audio
 
 Ogni suono della stazione è generato da uno script (`tools/gen_audio.py`),
 come gli sprite: onde quadre e triangolari, niente registrazioni. La
@@ -370,7 +411,7 @@ ricordata tra una sessione e l'altra.
 
 ---
 
-## 9. Consigli di sopravvivenza
+## 10. Consigli di sopravvivenza
 
 1. **Un radiatore prima del secondo reattore.** Due reattori sono +80 di
    calore: il surriscaldamento perdona 6 tick, poi rompe qualcosa a caso
@@ -386,10 +427,11 @@ ricordata tra una sessione e l'altra.
    support. Non ricostruirli: ricollegali.
 5. **La Batteria non produce niente — e vince partite.** Un picco di
    consumo (il laboratorio che si riattiva, l'avaria del reattore
-   gemello) si assorbe con 150 di carica. Guarda `batt` nell'HUD.
-6. **Riparare è gratis, accorgersene no.** Il tasto `R` sistema
-   un'avaria all'istante: il costo vero è il tempo in cui il modulo è
-   rimasto fermo senza che te ne accorgessi. Leggi il registro eventi.
+   gemello) si assorbe con 250 di carica. Guarda `batt` nell'HUD.
+6. **Riparare costa braccia, accorgersene costa tempo.** Il tasto `R`
+   apre un cantiere: 2 persone per 8 tick che intanto non lavorano nei
+   laboratori. Con l'equipaggio contato, scegli COSA riparare prima — o
+   tieni una "Squadra di riparazione" in magazzino per le notti storte.
 
 ---
 

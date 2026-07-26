@@ -93,6 +93,146 @@ pub struct UltimoPiazzamento(pub Option<usize>);
 #[derive(Resource, Default)]
 pub struct UltimaMedaglia(pub Option<(crate::progressi::Medaglia, u32)>);
 
+// ---------------- obiettivi bonus ----------------
+
+/// L'obiettivo bonus opzionale del livello: +1 credito una tantum se lo
+/// rispetti mentre completi l'obiettivo vero. Deterministico dall'indice.
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub enum Bonus {
+    /// Nessun modulo demolito col tasto destro (la Gru che si smonta da
+    /// sola non conta: porta via anche un detrito).
+    SenzaDemolire,
+    /// Nessuna scorta del Marketplace consumata.
+    SenzaScorte,
+    /// Completare con al più N moduli sulla griglia (max_moduli − 2).
+    SottoBudget(u32),
+    /// La riserva d'ossigeno non scende mai sotto 50 a simulazione avviata.
+    OssigenoMai50,
+}
+
+impl Bonus {
+    pub fn descrizione(&self) -> String {
+        match *self {
+            Bonus::SenzaDemolire => "senza demolire moduli".into(),
+            Bonus::SenzaScorte => "senza usare scorte".into(),
+            Bonus::SottoBudget(n) => format!("con al più {n} moduli"),
+            Bonus::OssigenoMai50 => "ossigeno mai sotto 50".into(),
+        }
+    }
+}
+
+/// Il bonus del livello `i` (0-based): rotazione sull'indice, saltando i
+/// bonus senza senso lì — niente "senza scorte" prima del livello 10
+/// (le scorte si scoprono con le prime medaglie) e niente "sotto budget"
+/// dove il margine sul fabbisogno è già ≤ 2.
+pub fn bonus_del_livello(i: usize) -> Bonus {
+    let livello = &LIVELLI[i];
+    let margine =
+        livello.max_moduli as i64 - generatore::fabbisogno_minimo(&livello.obiettivo) as i64;
+    let candidati = [
+        Bonus::SenzaDemolire,
+        Bonus::OssigenoMai50,
+        Bonus::SottoBudget(livello.max_moduli.saturating_sub(2)),
+        Bonus::SenzaScorte,
+    ];
+    for passo in 0..candidati.len() {
+        let scelto = candidati[(i + passo) % candidati.len()];
+        let valido = match scelto {
+            Bonus::SenzaScorte => i + 1 >= 10,
+            Bonus::SottoBudget(_) => margine >= 3,
+            _ => true,
+        };
+        if valido {
+            return scelto;
+        }
+    }
+    Bonus::SenzaDemolire
+}
+
+/// Sorveglianza del bonus in corso: baseline e flag di violazione.
+/// Si azzera da sé quando il tick torna a 0 (reset o pre-avvio): la fase
+/// di costruzione iniziale è franca per demolizioni e scorte.
+#[derive(Resource, Default)]
+pub struct StatoBonus {
+    pub violato: bool,
+    celle: usize,
+    ostacoli: usize,
+    scorte: usize,
+}
+
+/// Esito bonus dell'ultimo livello completato:
+/// (bonus, rispettato, credito guadagnato ora). Per la schermata vittoria.
+#[derive(Resource, Default)]
+pub struct UltimoBonus(pub Option<(Bonus, bool, bool)>);
+
+/// Rileva le violazioni del bonus osservando le risorse, senza toccare la
+/// simulazione: demolizione = celle che calano più degli ostacoli (la Gru
+/// porta via entrambi), scorte = inventario che cala in partita, ossigeno
+/// = soglia attraversata a simulazione avviata.
+pub fn sorveglia_bonus(
+    modalita: Res<Modalita>,
+    sim: Res<Sim>,
+    station: Res<crate::Station>,
+    portafoglio: Res<crate::progressi::Portafoglio>,
+    mut stato: ResMut<StatoBonus>,
+) {
+    let Modalita::Campagna(i) = *modalita else {
+        return;
+    };
+    if sim.tick == 0 {
+        stato.violato = false;
+        stato.celle = station.celle.len();
+        stato.ostacoli = station.ostacoli.len();
+        stato.scorte = portafoglio.scorte.len();
+        return;
+    }
+    match bonus_del_livello(i) {
+        Bonus::SenzaDemolire => {
+            let calo_celle = stato.celle.saturating_sub(station.celle.len());
+            let calo_ostacoli = stato.ostacoli.saturating_sub(station.ostacoli.len());
+            if calo_celle > calo_ostacoli {
+                stato.violato = true;
+            }
+        }
+        Bonus::SenzaScorte => {
+            if portafoglio.scorte.len() < stato.scorte {
+                stato.violato = true;
+            }
+        }
+        Bonus::OssigenoMai50 => {
+            if sim.running && sim.ossigeno < 50.0 {
+                stato.violato = true;
+            }
+        }
+        // il "sotto budget" si giudica solo al traguardo
+        Bonus::SottoBudget(_) => {}
+    }
+    stato.celle = station.celle.len();
+    stato.ostacoli = station.ostacoli.len();
+    stato.scorte = portafoglio.scorte.len();
+}
+
+// ---------------- sfida del giorno ----------------
+
+/// La sfida del giorno in corso (se `attiva`): stesso seed per tutti nel
+/// giorno, fuori da classifiche e progressione, miglior tempo persistito.
+#[derive(Resource, Default)]
+pub struct SfidaDelGiorno {
+    pub attiva: bool,
+    pub giorno: u64,
+}
+
+/// Esito della sfida del giorno appena completata:
+/// (tick di questa run, miglior tempo di oggi, è un nuovo record).
+#[derive(Resource, Default)]
+pub struct UltimaGiornaliera(pub Option<(u64, u64, bool)>);
+
+/// Il giorno corrente come giorni interi dall'epoch Unix: la chiave della
+/// sfida del giorno (uguale per tutti nello stesso giorno UTC).
+pub fn giorno_corrente() -> u64 {
+    epoch_adesso() / 86_400
+}
+
 // ---------------- livelli ----------------
 
 /// Un obiettivo misurabile. I numeri stanno nella tabella `LIVELLI`.
@@ -317,6 +457,11 @@ pub fn controlla_obiettivo(
     mut progressione: ResMut<Progressione>,
     mut portafoglio: ResMut<crate::progressi::Portafoglio>,
     mut medaglia: ResMut<UltimaMedaglia>,
+    stato_bonus: Res<StatoBonus>,
+    mut ultimo_bonus: ResMut<UltimoBonus>,
+    sfida: Res<SfidaDelGiorno>,
+    mut giornaliera: ResMut<UltimaGiornaliera>,
+    station: Res<crate::Station>,
     moduli: Query<&Module>,
     mut log: ResMut<EventLog>,
     mut prossimo: ResMut<NextState<AppState>>,
@@ -345,8 +490,11 @@ pub fn controlla_obiettivo(
             sim.tick,
             format!("Obiettivo raggiunto: {}", obiettivo.descrizione()),
         );
-        // progressione e medaglie solo in campagna: il casuale è fuori gara
+        // progressione, medaglie e bonus solo in campagna; la sfida del
+        // giorno registra il miglior tempo. Il casuale puro è fuori gara.
         medaglia.0 = None;
+        ultimo_bonus.0 = None;
+        giornaliera.0 = None;
         if let Modalita::Campagna(i) = *modalita {
             if i + 1 > progressione.completati {
                 progressione.completati = i + 1;
@@ -361,6 +509,23 @@ pub fn controlla_obiettivo(
                 );
             }
             medaglia.0 = Some((presa, crediti));
+            let bonus = bonus_del_livello(i);
+            let rispettato = !stato_bonus.violato
+                && match bonus {
+                    Bonus::SottoBudget(n) => station.celle.len() as u32 <= n,
+                    _ => true,
+                };
+            let nuovo = rispettato && portafoglio.registra_bonus(i);
+            if nuovo {
+                log.info(sim.tick, "Obiettivo bonus centrato: +1 credito");
+            }
+            ultimo_bonus.0 = Some((bonus, rispettato, nuovo));
+        } else if sfida.attiva {
+            let (record, migliore) = portafoglio.registra_giornaliera(sfida.giorno, sim.tick);
+            giornaliera.0 = Some((sim.tick, migliore, record));
+            if record {
+                log.info(sim.tick, "Sfida del giorno: nuovo miglior tempo");
+            }
         }
         prossimo.set(AppState::LivelloCompletato);
     }

@@ -14,9 +14,15 @@
 > sciame, pianeta — parenti stretti della 9.1 ma senza scelta), regola dei
 > conduttori (i corridoi sono la dorsale), obiettivi **pesati per blocco**
 > (§2.2, era l'intento originario) e livelli 7–50 **rigenerati** con la
-> ritaratura. **Restano proposte**: 9.1 eventi CON SCELTA (il bivio a due
-> opzioni), 9.2 riparazione con costo, 9.6 sfida del giorno, i tratti
-> passivi dei personaggi (§4) e i livelli curati di fine blocco.
+> ritaratura. Dalla v0.8: **§9.1 eventi con scelta ✓** (`eventi.rs`: 5
+> bivi con conseguenze dichiarate), **§9.2 riparazione con costo ✓**
+> (2 equipaggio × 8 tick, `sim.rs`), **§9.6 sfida del giorno ✓**
+> (`genera_giornaliera`, miglior tempo per giorno), **§4 tratti passivi ✓**
+> (`squadra.rs`: schieramento dal prologo, sblocchi 10/20/30/40/50, Ilse
+> col comando doppio; i numeri finali sono quelli della tabella §4, con
+> Mira passata a "−25% energia dei laboratori" perché i punti-lab non
+> esistono). **Resta proposto soltanto**: i livelli curati di fine blocco
+> (10, 15, 20… disegnati a mano attorno allo sblocco appena ottenuto).
 
 Obiettivo dell'iterazione, nelle parole del giocatore: campagna lunga
 (~50 livelli) percorsa in modo lineare, sblocchi che danno cose utili ogni
@@ -139,7 +145,7 @@ descrizione nella UI di scelta (ritratti pixel art rimandabili).
 | **Ingegnere** | Il calore dei reattori scende del 25% (40→30/tick) | tabella valori al volo | liv. 10 |
 | **Medico** | Asfissia dimezzata: un morto ogni 6 tick invece di 3 | `TICK_MORTE` | liv. 20 |
 | **Caposquadra** | Arrivi più rapidi: 1 ogni 3 tick invece di 4 | `TICK_ARRIVO` | liv. 30 |
-| **Scienziata** | I punti dei laboratori raddoppiano (vedi sez. 5) | punteggio | liv. 40 |
+| **Scienziata** | I laboratori consumano il 25% di energia in meno *(cambiata in corsa: i punti-lab della sez. 5 non esistono)* | allocazione energia | liv. 40 |
 | **Comandante** | Puoi schierare **due** personaggi insieme | meta-regola | liv. 50 |
 
 Implementazione: una risorsa `Squadra` con i modificatori attivi; il tick

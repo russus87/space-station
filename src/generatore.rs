@@ -125,6 +125,21 @@ pub fn genera_casuale(seed: u64) -> LivelloDef {
     genera(difficolta, rng, true)
 }
 
+/// La sfida del giorno: stesso livello per TUTTI nello stesso giorno
+/// (giorni interi dall'epoch Unix), difficoltà fissa di metà campagna.
+/// Il seed mescola il giorno con una costante dedicata: cambiarla cambia
+/// tutte le sfide future, mai quelle già giocate (il record è per giorno).
+pub fn genera_giornaliera(giorno: u64) -> LivelloDef {
+    const SEME_GIORNO: u64 = 0x5F1D_A0DE_0DE1_D1A0;
+    let mut livello = genera(
+        25,
+        Rng::new(SEME_GIORNO ^ giorno.wrapping_mul(0x9E37_79B9_7F4A_7C15)),
+        true,
+    );
+    livello.nome = format!("Sfida del giorno — {}", livello.nome);
+    livello
+}
+
 fn genera(n: usize, mut rng: Rng, casuale: bool) -> LivelloDef {
     let n32 = n as u32;
     // Obiettivi PESATI per blocco (SPEC-CAMPAGNA §1: i livelli dopo uno
@@ -408,6 +423,22 @@ mod test {
                 i + 1
             );
         }
+    }
+
+    #[test]
+    fn la_giornaliera_e_deterministica_nel_giorno_e_cambia_col_giorno() {
+        let a = genera_giornaliera(20_000);
+        let b = genera_giornaliera(20_000);
+        assert_eq!(a.nome, b.nome);
+        assert_eq!(a.max_moduli, b.max_moduli);
+        assert_eq!(a.ostacoli, b.ostacoli);
+        assert!(a.nome.starts_with("Sfida del giorno — "));
+        // giorni diversi: almeno un tratto del livello cambia
+        let c = genera_giornaliera(20_001);
+        assert!(a.nome != c.nome || a.ostacoli != c.ostacoli || a.max_moduli != c.max_moduli);
+        // e resta risolvibile come ogni livello generato
+        assert!(a.max_moduli >= fabbisogno_minimo(&a.obiettivo));
+        assert!(area_libera_connessa(&a.ostacoli) >= a.max_moduli);
     }
 
     #[test]

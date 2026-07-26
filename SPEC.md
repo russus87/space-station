@@ -39,6 +39,23 @@ Il log eventi funziona e resta, concettualmente invariato.
 > (capienza 250, ricarica 25, calore +1) e Serra (−8/+25/+6) ribilanciate
 > con obiettivi pesati per blocco; Registro collassabile, scorte a icone
 > con tooltip (via il tasto M), briefing sostituito dal prologo.
+>
+> **Iterazione 7 (implementata)**: **riparazione con costo** (`sim.rs`:
+> il tasto R apre un cantiere da 2 di equipaggio × 8 tick, sospeso senza
+> braccia; la scorta "Squadra di riparazione" resta l'unica via
+> istantanea); **squadra schierabile** (`squadra.rs` + selettore nel
+> prologo: tratti passivi di Vera/Tomas/Dario/Mira/Ilse, sblocchi ai
+> traguardi 10/20/30/40/50, comando doppio con Ilse); **eventi con
+> scelta** (`eventi.rs`: 5 bivi rari che congelano la sim, conseguenze
+> dichiarate, mai durante gli imprevisti, grazia 60/cooldown 80, campagna
+> dal livello 8); **obiettivi bonus** di campagna (`livelli.rs`:
+> senza-demolire / senza-scorte / sotto-budget / ossigeno-mai-50, +1
+> credito una tantum, sorveglianza senza falsi positivi per Gru e Sonda);
+> **Sfida del giorno** (`generatore::genera_giornaliera`: livello dalla
+> data, miglior tempo per giorno in `progressi.txt`); **particelle**
+> (`particelle.rs`: fumo/scintille/bollicine, cap 120) e **titolo vivo**
+> (`attract.rs`: pianeta, meteore e stelle dietro il menu
+> semitrasparente).
 
 ---
 
@@ -547,7 +564,7 @@ obiettivi. Il codice sta in `src/livelli.rs`; la simulazione non cambia
 regole (unica aggiunta a `Sim`: il contatore di solo output
 `avarie_surriscaldamento`, incrementato dove l'avaria già avveniva).
 
-### 13.1 Quattro modalità
+### 13.1 Cinque modalità
 
 | Modalità | Cos'è | Tetto di tick | Punteggio |
 |---|---|---|---|
@@ -555,6 +572,7 @@ regole (unica aggiunta a `Sim`: il contatore di solo output
 | **Infinita** | Sandbox senza obiettivi, con la fine partita esistente: si resiste quanto si riesce. | No | Sorgente della classifica **Infinita** |
 | **Sfida** | Come Infinita — nessun obiettivo, si punta al punteggio — ma con lo stesso tetto della Campagna: partite più brevi, esito garantito entro un tempo fisso. | Sì (400) | Sorgente della classifica **Sfida** |
 | **Casuale** | Un livello generato al momento (obiettivo attivo come in campagna), fuori da progressione e classifiche. | Sì (400) | Solo a schermo |
+| **Sfida del giorno** | Il livello del giorno, uguale per tutti (seed dalla data via `genera_giornaliera`): fuori classifiche, conta il miglior tempo personale del giorno (`progressi.txt`). | Sì (400) | Miglior tempo locale |
 
 Aggiunta dopo un playtest in cui una partita Infinita persa in sostanza
 (spirale di asfissia lenta) si è trascinata per centinaia di tick senza

@@ -4,8 +4,10 @@
 //! cablaggio degli stati dell'app. La UI di gioco sta in `ui.rs`, le
 //! schermate di menu in `menu.rs`.
 
+mod attract;
 mod audio;
 mod commenti;
+mod eventi;
 mod generatore;
 mod impostazioni;
 mod imprevisti;
@@ -17,7 +19,9 @@ mod personaggi;
 mod progressi;
 mod prologo;
 mod modules;
+mod particelle;
 mod sim;
+mod squadra;
 mod ui;
 
 use bevy::platform::collections::{HashMap, HashSet};
@@ -244,6 +248,13 @@ fn main() {
         .init_resource::<mercato::Mercato>()
         .init_resource::<ui::RegistroAperto>()
         .init_resource::<imprevisti::Imprevisti>()
+        .init_resource::<squadra::Squadra>()
+        .init_resource::<eventi::EventoAperto>()
+        .init_resource::<eventi::Eventi>()
+        .init_resource::<livelli::StatoBonus>()
+        .init_resource::<livelli::UltimoBonus>()
+        .init_resource::<livelli::SfidaDelGiorno>()
+        .init_resource::<livelli::UltimaGiornaliera>()
         .init_resource::<musica::MusicaSospesa>()
         .init_resource::<musica::StatoMusica>()
         .init_resource::<livelli::UltimaMedaglia>()
@@ -268,6 +279,7 @@ fn main() {
                 audio::carica_suoni,
                 imprevisti::carica_suoni,
                 imprevisti::carica_arte,
+                attract::carica_arte,
                 (setup, ui::setup_ui),
             )
                 .chain(),
@@ -313,14 +325,18 @@ fn main() {
                 // anche un modulo sulla griglia dietro
                 input_tastiera.run_if(costruzione_permessa),
                 sim::tasto_velocita.run_if(costruzione_permessa),
+                eventi::scegli,
                 input_mouse.run_if(costruzione_permessa),
                 prologo::click,
                 ui::click_palette,
                 ui::click_bottone_menu,
                 mercato::click_scorte,
-                sim::sim_tick.run_if(sim_attiva),
+                // il bivio di un evento congela il mondo finché non scegli
+                sim::sim_tick.run_if(sim_attiva.and_then(eventi::nessun_evento)),
                 imprevisti::pianifica_e_applica,
+                eventi::pianifica,
                 applica_gru,
+                livelli::sorveglia_bonus,
                 // in Infinita/Sfida il codice degli obiettivi non gira proprio
                 livelli::controlla_obiettivo.run_if(livelli::obiettivi_attivi),
                 controlla_fine,
@@ -338,6 +354,10 @@ fn main() {
                     aggiorna_visuali,
                     orienta_corridoi,
                     prologo::sincronizza,
+                    eventi::sincronizza,
+                    particelle::emetti,
+                    particelle::muovi,
+                    attract::anima,
                     ui::registro,
                     ui::tooltip_scorte,
                     imprevisti::anima,
@@ -358,6 +378,7 @@ fn main() {
                 (
                     menu::aggiorna_voci_volume,
                     menu::aggiorna_voci_marketplace,
+                    menu::aggiorna_voce_giornaliera,
                     menu::anima_monete,
                     screenshot_tasto,
                     demo_foto,
@@ -388,8 +409,9 @@ fn sim_attiva(pausa: Res<Pausa>) -> bool {
 fn costruzione_permessa(
     prologo_res: Res<prologo::Prologo>,
     scorte: Res<mercato::Mercato>,
+    evento: Res<eventi::EventoAperto>,
 ) -> bool {
-    prologo_res.pagina.is_none() && !scorte.aperto
+    prologo_res.pagina.is_none() && !scorte.aperto && !evento.0
 }
 
 /// Il font di default di Bevy è un subset ASCII di Fira Mono: «·», «—»,
@@ -623,9 +645,26 @@ fn input_tastiera(
         && let Some(e) = sotto.0
         && let Ok(mut m) = moduli.get_mut(e)
         && m.broken
+        && m.riparazione == 0
     {
-        m.broken = false;
-        log.info(sim.tick, format!("Riparato: {}", m.etichetta));
+        if sim::equipaggio_libero(&sim) >= sim::EQUIPAGGIO_RIPARAZIONE {
+            m.riparazione = sim::TICK_RIPARAZIONE;
+            log.info(
+                sim.tick,
+                format!(
+                    "{}: riparazione avviata ({} impegnati per {} tick)",
+                    m.etichetta,
+                    sim::EQUIPAGGIO_RIPARAZIONE,
+                    sim::TICK_RIPARAZIONE
+                ),
+            );
+        } else {
+            log.push(
+                sim.tick,
+                sim::Gravita::Avviso,
+                format!("{}: serve equipaggio libero per riparare", m.etichetta),
+            );
+        }
     }
 }
 
@@ -666,6 +705,7 @@ fn costruisci_modulo(
                 collegato: true, // il primo tick (anche in anteprima) lo ricalcola
                 carica: 0.0,
                 lavoro: 0,
+                riparazione: 0,
             },
             Scena,
         ))
@@ -1029,6 +1069,7 @@ fn cursore_pixel(
     pausa: Res<Pausa>,
     prologo_res: Res<prologo::Prologo>,
     scorte: Res<mercato::Mercato>,
+    evento: Res<eventi::EventoAperto>,
     finestre: Query<Entity, With<PrimaryWindow>>,
     mut commands: Commands,
 ) {
@@ -1039,7 +1080,8 @@ fn cursore_pixel(
     let mirino = *stato.get() == AppState::InGioco
         && !pausa.aperta
         && prologo_res.pagina.is_none()
-        && !scorte.aperto;
+        && !scorte.aperto
+        && !evento.0;
     if *attuale == Some(mirino) {
         return;
     }
@@ -1221,9 +1263,12 @@ fn applica_reset(
     mut log: ResMut<EventLog>,
     mut sel: ResMut<Selected>,
     mut stato_livello: ResMut<livelli::StatoLivello>,
-    mut offerte: ResMut<mercato::Mercato>,
-    mut stato_musica: ResMut<musica::StatoMusica>,
-    mut prologo_res: ResMut<prologo::Prologo>,
+    mut accessori: (
+        ResMut<mercato::Mercato>,
+        ResMut<squadra::Squadra>,
+        ResMut<musica::StatoMusica>,
+        ResMut<prologo::Prologo>,
+    ),
     modalita: Res<Modalita>,
     casuale: Res<livelli::LivelloCasuale>,
     griglia: Res<Griglia>,
@@ -1246,7 +1291,8 @@ fn applica_reset(
     };
     *stato_livello = livelli::StatoLivello::default();
     sel.0 = ModuleKind::Reattore;
-    stato_musica.pesca_casuale();
+    *accessori.1 = squadra::Squadra::default();
+    accessori.2.pesca_casuale();
     log.svuota();
     // campagna e casuale condividono tutto: livello con obiettivo, detriti
     // e budget; cambia solo da dove arriva la definizione
@@ -1289,8 +1335,8 @@ fn applica_reset(
         // ma solo la prima volta che si incontra questo livello: al decimo
         // "Riprova" il sipario non serve più
         match *modalita {
-            Modalita::Campagna(i) => prologo_res.richiedi(i as u64),
-            Modalita::Casuale => prologo_res.richiedi(prologo::chiave_casuale(livello)),
+            Modalita::Campagna(i) => accessori.3.richiedi(i as u64),
+            Modalita::Casuale => accessori.3.richiedi(prologo::chiave_casuale(livello)),
             _ => {}
         }
     } else {
@@ -1301,9 +1347,9 @@ fn applica_reset(
             ),
             _ => log.info(0, "Nuova stazione: costruisci e premi Spazio"),
         }
-        prologo_res.pagina = None;
+        accessori.3.pagina = None;
     }
-    offerte.aperto = false;
+    accessori.0.aperto = false;
 }
 
 #[cfg(test)]

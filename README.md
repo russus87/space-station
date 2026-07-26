@@ -11,17 +11,24 @@ ogni tanto un pianeta di passaggio che porta gente); il punteggio è
 persone·tick e la partita finisce quando l'equipaggio torna a zero. Rust + Bevy 0.19, pixel art generata da script
 (`tools/gen_sprites.py`).
 
-Quattro modalità: la **Campagna** (50 livelli in sequenza — 6 curati che
+Cinque modalità: la **Campagna** (50 livelli in sequenza — 6 curati che
 insegnano i meccanismi, 44 generati con seed fisso a difficoltà crescente —
-con obiettivo misurabile nell'HUD, detriti da aggirare e un budget di
-moduli per livello; completarne uno sblocca il successivo), l'**Infinita**
-(sandbox senza obiettivi né limiti di tempo), la **Sfida** (come
-l'Infinita ma con un tetto di 400 tick: partite brevi e confrontabili) e
-il **Livello casuale** (generato al momento, fuori da progressione e
-classifiche). Infinita e Sfida hanno ciascuna la propria **classifica**
+con obiettivo misurabile nell'HUD, un **obiettivo bonus** opzionale che
+frutta crediti, detriti da aggirare e un budget di moduli per livello;
+completarne uno sblocca il successivo), l'**Infinita** (sandbox senza
+obiettivi né limiti di tempo), la **Sfida** (come l'Infinita ma con un
+tetto di 400 tick: partite brevi e confrontabili), il **Livello casuale**
+(generato al momento, fuori da progressione e classifiche) e la **Sfida
+del giorno** (lo stesso livello per tutti, generato dalla data, col
+miglior tempo personale salvato in locale). Infinita e Sfida hanno ciascuna la propria **classifica**
 locale top 10. In campagna il tempo fa le **medaglie** (oro/argento/rame
 sulle soglie 35%/60%/100% del limite) che fruttano crediti da spendere nel
-**Marketplace** — scorte una tantum da usare in partita, mai valuta reale. Classifiche e
+**Marketplace** — scorte una tantum da usare in partita, mai valuta reale.
+Ai traguardi 10/20/30/40/50 si sblocca la **squadra**: dal prologo si
+sceglie chi portare in plancia, e ogni personaggio piega un numero del
+gioco (meno calore, asfissia lenta, arrivi rapidi, lab efficienti,
+comando doppio). Durante la partita capitano **eventi con scelta** (bivi
+con conseguenze dichiarate) oltre agli imprevisti con la sirena. Classifiche e
 progressione della campagna sono file di testo semplice in
 `$XDG_DATA_HOME/space-station/` (ripiego `~/.local/share/space-station/`):
 una riga malformata si ignora, un file assente vale "nessun dato". I
@@ -62,7 +69,7 @@ il percorso di `assets/` è risolto a runtime.
 | `1..6`, `7 8 9 0 C` / click sulla palette | seleziona il modulo (i 6 base più i 5 sbloccabili lungo la campagna) |
 | click sinistro | piazza il modulo selezionato sulla cella |
 | click destro | rimuove il modulo sulla cella |
-| `R` | ripara il modulo in avaria sotto il cursore |
+| `R` | avvia la riparazione dell'avaria sotto il cursore: 2 di equipaggio impegnati per 8 tick |
 | `Spazio` | avvia/ferma la simulazione (da fermo si costruisce senza conseguenze, l'HUD mostra l'anteprima del bilancio) |
 | `V` | velocità di gioco ×1/×2/×4 (stesse regole, tick più rapidi) |
 | `Esc` | apre il menu di pausa (con i volumi) e **congela il tick** (è un'altra cosa rispetto a `Spazio`) |
@@ -128,6 +135,10 @@ e in `src/ui.rs` — e va tenuta allineata a `SPEC.md` §2.2.
 | `src/personaggi.rs` | i cinque personaggi: battute del prologo, intermezzi, annunci di sblocco, commenti in partita |
 | `src/prologo.rs` | il prologo a fumetto che apre ogni livello (solo alla prima visita) |
 | `src/commenti.rs` | i mini-fumetti dei personaggi sugli eventi di gioco |
+| `src/eventi.rs` | i bivi con scelta: 5 eventi rari che congelano la sim, conseguenze dichiarate |
+| `src/squadra.rs` | i tratti passivi dei personaggi schierabili in plancia |
+| `src/particelle.rs` | fumo, scintille e bollicine sopra la griglia |
+| `src/attract.rs` | il titolo vivo: pianeta, meteore e stelle dietro il menu |
 | `src/imprevisti.rs` | gli imprevisti casuali: meteoriti, tempeste, sciami, pianeti — con sirena e preavviso |
 | `src/musica.rs` | colonna sonora: traccia per blocco narrativo, pescata a caso nelle sandbox |
 | `src/audio.rs` | effetti sonori e regole di riproduzione |

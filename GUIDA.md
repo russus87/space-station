@@ -29,7 +29,7 @@ il 35% del limite ed è **oro** (su un limite di 4:40 vuol dire entro
 selezione e frutta **crediti** (1/2/3, solo quando migliori) da spendere
 nel **Marketplace** del titolo per comprare scorte.
 
-## Le quattro modalità
+## Le cinque modalità
 
 Dal titolo scegli come giocare:
 
@@ -41,8 +41,11 @@ Dal titolo scegli come giocare:
   raggiungendo l'obiettivo; si perde perdendo la stazione o a tetto di
   tick raggiunto, e in entrambi i casi puoi riprovare subito. Completare
   un livello **sblocca il successivo**, e il gioco se lo ricorda tra una
-  sessione e l'altra. Il punteggio si vede anche qui, ma non va in
-  classifica. Nella griglia di selezione le frecce su/giù saltano di riga,
+  sessione e l'altra. Ogni livello ha anche un **obiettivo bonus**
+  opzionale (scritto nell'HUD accanto all'obiettivo: "senza demolire",
+  "senza scorte", "sotto budget", "ossigeno mai sotto 50"): rispettarlo
+  vale **+1 credito** una tantum, violarlo non fa perdere niente. Il
+  punteggio si vede anche qui, ma non va in classifica. Nella griglia di selezione le frecce su/giù saltano di riga,
   sinistra/destra di casella.
 - **Infinita** — la sandbox senza obiettivi e senza tetto di tick:
   costruisci, resisti quanto riesci, fai punti. Va nella classifica
@@ -56,6 +59,10 @@ Dal titolo scegli come giocare:
   obiettivo, detriti e budget nella fascia media della campagna. Fuori da
   progressione e classifiche; se lo perdi puoi riprovare **lo stesso**
   livello, se lo vinci te ne genera un altro.
+- **Sfida del giorno** — un livello **uguale per tutti** nello stesso
+  giorno, generato dalla data. Fuori dalle classifiche: conta solo il tuo
+  **miglior tempo di oggi**, salvato in locale; la voce del titolo si
+  spunta (✓) quando l'hai completata. Domani ce n'è un'altra.
 
 ### I primi sei livelli della campagna
 
@@ -66,7 +73,7 @@ difficoltà crescente):
 | # | Nome | Obiettivo | Moduli |
 |---|---|---|---|
 | 1 | Primo respiro | avere 4 di equipaggio a bordo | 6 |
-| 2 | La rete | avere 8 di equipaggio a bordo | 12 |
+| 2 | La rete | avere 8 di equipaggio a bordo | 13 |
 | 3 | Sala macchine | tenere 2 laboratori attivi per 15 tick consecutivi | 13 |
 | 4 | Termica | sopravvivere 60 tick con almeno 2 laboratori attivi e zero avarie da surriscaldamento | 14 |
 | 5 | Autonomia | raggiungere 400 punti senza mai andare in blackout | 15 |
@@ -114,7 +121,8 @@ peggio.
   conquisti) con i loro costi; sotto, le **icone delle scorte** comprate
   nel Marketplace (passaci sopra per il tooltip, cliccale per usarle) e il
   pannello ispezione: punta un modulo col mouse e leggi cosa fa.
-- **Al centro**: la griglia 14×8 dove costruisci.
+- **Al centro**: la griglia 14×8 dove costruisci — e che vive: fumo dai
+  moduli in avaria, scintille dai reattori, bollicine dai life support.
 - **In basso**: il **Registro** eventi, chiuso di default — clicca
   l'icona "Registro" per aprirlo. Ogni cosa che succede — un blackout,
   un'avaria, un morto — scrive una riga lì. È lo strumento principale per
@@ -129,7 +137,7 @@ con il 2). Un modulo fermo mostra un simbolo che dice il perché:
 | Fulmine giallo | Non alimentato: l'energia della sua rete non basta | Aggiungi reattori o spegni consumi |
 | Fulmine grigio | Scollegato: la sua rete non ha reattori | Collegalo al reattore con altri moduli (i corridoi costano poco) |
 | Omino grigio | Fermo: manca equipaggio | Costruisci dormitori e aspetta gli arrivi |
-| Triangolo rosso lampeggiante | In avaria | Puntalo e premi `R` |
+| Triangolo rosso lampeggiante | In avaria | Puntalo e premi `R`: 2 di equipaggio per 8 tick (o usa la scorta "Squadra di riparazione": tutto subito) |
 
 ## Comandi
 
@@ -139,18 +147,28 @@ con il 2). Un modulo fermo mostra un simbolo che dice il perché:
 | `7` `8` `9` `0` `C` | Seleziona un modulo sbloccabile (Batteria, Serra, Gru, Condotto, Centro comando — si conquistano completando i livelli 5/15/25/35/45 della campagna) |
 | Click sinistro | Piazza il modulo selezionato nella cella libera |
 | Click destro | Rimuove il modulo sotto il cursore (perso, non recuperabile) |
-| `R` | Ripara il modulo in avaria sotto il cursore (gratis) |
+| `R` | Avvia la **riparazione** del modulo in avaria sotto il cursore: impegna **2 di equipaggio per 8 tick** (sospesa se mancano braccia, riprende da dove era). L'ispezione mostra i tick mancanti |
 | `Spazio` | Avvia/ferma la simulazione |
 | `V` | Cambia la velocità di gioco: ×1 → ×2 → ×4 (stesse regole, tick più rapidi; l'HUD mostra ×2/×4) |
 | `Esc` | Apre il menu di pausa (riprendi, volumi di musica ed effetti, ricomincia, torna al titolo) |
 | `F12` | Salva uno screenshot nella cartella corrente |
 
-All'ingresso in un livello (campagna o casuale) c'è un **prologo a
-fumetto**: compare solo la **prima volta** che incontri quel livello e si
-naviga anche con `Invio` (avanti / Gioca!) e `Backspace` (indietro).
+All'ingresso in un livello (campagna o casuale) c'è un **prologo**: la
+pagina con obiettivo, budget e medaglia da battere si vede sempre, la
+vignetta del personaggio solo la **prima volta**; si naviga anche con
+`Invio` (avanti / Gioca!) e `Backspace` (indietro). Sempre nel prologo
+scegli **chi portare in plancia**: dai traguardi di campagna 10/20/30/40/50
+sblocchi i cinque dell'equipaggio, ognuno con un tratto passivo (Vera:
+−25% calore dei reattori; Tomas: asfissia dimezzata; Dario: arrivi ogni 3
+tick; Mira: −25% energia dei laboratori; Ilse: comando doppio, due posti
+in plancia).
 Durante la partita i personaggi **commentano gli eventi chiave** (primo
 blackout, prima avaria, ossigeno critico…) con un mini-fumetto sopra il
-log: sparisce da solo dopo qualche secondo.
+log: sparisce da solo dopo qualche secondo. E ogni tanto (una-due volte a
+partita, mai durante un imprevisto, dal livello 8) uno di loro ti porta un
+**bivio**: la simulazione si congela e scegli tra due opzioni con le
+conseguenze **scritte chiare** — click o tasti `1`/`2`. Nave che chiede
+attracco, mercanti, clandestini: decidere è il mestiere.
 
 Per moduli sbloccabili, personaggi, storia e mercato nel dettaglio c'è il
 **MANUALE.md** — questa guida copre le basi.
@@ -331,7 +349,8 @@ avrebbe fatto rete a sé.
   life support ne produce 50: oltre 5 persone per life support la riserva
   scende. Se costruisci molti dormitori, costruisci anche i life support.
 - **Rimuovere invece di riparare.** Il tasto destro **demolisce** il modulo,
-  anche uno sano. Un modulo in avaria si ripara gratis con `R`: demolirlo è
+  anche uno sano. Un modulo in avaria si ripara con `R` (2 di equipaggio
+  per 8 tick): demolirlo è
   quasi sempre uno spreco.
 - **Avviare senza guardare l'anteprima.** Da fermo, l'HUD mostra già il
   bilancio del tuo progetto. Se c'è del giallo o del rosso prima di premere

@@ -134,6 +134,13 @@ impl Imprevisti {
         self.sirena_fino.is_some_and(|fino| tick <= fino)
     }
 
+    /// Nessun imprevisto in preavviso o in corso, e sirena spenta: il
+    /// momento buono per qualunque altra interruzione (eventi.rs non apre
+    /// bivi mentre piovono meteore).
+    pub fn tranquillo(&self, tick: u64) -> bool {
+        self.fase == Fase::Quiete && !self.sirena_accesa(tick)
+    }
+
     /// La tempesta elettromagnetica è in corso?
     pub fn tempesta_in_corso(&self) -> bool {
         matches!(
@@ -430,10 +437,10 @@ pub fn pianifica_e_applica(
                 // avanza anche a bilancio in ordine
                 sim.surriscaldamento += 1;
             }
-            Tipo::Pianeta => {
+            Tipo::Pianeta
                 // arrivi raddoppiati: un ospite in più ogni 4 tick, con le
                 // stesse regole vere (posti liberi e aria buona)
-                if tick % 4 == 0 && sim.equipaggio < sim.posti_letto && sim.ossigeno > 50.0 {
+                if tick.is_multiple_of(4) && sim.equipaggio < sim.posti_letto && sim.ossigeno > 50.0 => {
                     sim.equipaggio += 1;
                     let ora = sim.equipaggio;
                     log.info(
@@ -441,7 +448,6 @@ pub fn pianifica_e_applica(
                         format!("Equipaggio: {} → {} (venuti per il panorama)", ora - 1, ora),
                     );
                 }
-            }
             _ => {}
         }
         if tick >= fine {
@@ -490,6 +496,7 @@ fn spawna_meteora(
 /// la sirena e la tinta della tempesta; e fa pulizia quando la scena non
 /// c'è più (menu, fine partita).
 #[allow(clippy::too_many_arguments)]
+#[allow(clippy::type_complexity)]
 pub fn anima(
     mut commands: Commands,
     tempo: Res<Time>,
@@ -686,6 +693,18 @@ mod test {
         assert_eq!(s.pianifica(50, sempre(0, 3)), Some(Tipo::Pianeta));
         assert!(matches!(s.fase, Fase::Attivo { tipo: Tipo::Pianeta, fine } if fine == 50 + DURATA_PIANETA));
         assert!(!s.sirena_accesa(50));
+    }
+
+    #[test]
+    fn tranquillo_solo_in_quiete_e_a_sirena_spenta() {
+        let mut s = Imprevisti::default();
+        assert!(s.tranquillo(10));
+        assert_eq!(s.pianifica(50, sempre(0, 0)), Some(Tipo::Meteorite));
+        assert!(!s.tranquillo(50)); // preavviso in corso
+        s.chiudi(50 + TICK_PREAVVISO);
+        // fase quieta ma la sirena ha ancora la coda accesa
+        assert!(!s.tranquillo(50 + TICK_PREAVVISO + CODA_SIRENA));
+        assert!(s.tranquillo(50 + TICK_PREAVVISO + CODA_SIRENA + 1));
     }
 
     #[test]

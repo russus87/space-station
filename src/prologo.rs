@@ -4,10 +4,11 @@
 //!
 //! Due pagine: la VIGNETTA (il personaggio in grande dentro una cornice da
 //! fumetto, col balloon di carta e la coda) e l'OBIETTIVO (nome, briefing,
-//! numeri del livello, medaglia in bacheca e tempi da battere, "Gioca!").
-//! L'obiettivo si mostra a OGNI avvio del livello; la vignetta solo la
-//! prima volta che quel livello si vede nella sessione: "Riprova il
-//! livello" va dritto all'obiettivo.
+//! numeri del livello, medaglia in bacheca e tempi da battere, il
+//! selettore della SQUADRA — chi porti in plancia, coi tratti passivi di
+//! `squadra.rs` — e "Gioca!"). L'obiettivo si mostra a OGNI avvio del
+//! livello; la vignetta solo la prima volta che quel livello si vede
+//! nella sessione: "Riprova il livello" va dritto all'obiettivo.
 //!
 //! Lo accende `applica_reset` chiamando `Prologo::richiedi(chiave)`, solo
 //! per Campagna e Casuale. Finché è acceso, `attivo` fa da run condition
@@ -17,10 +18,12 @@
 //! sinistra indietro quando la vignetta esiste).
 
 use crate::Art;
-use crate::livelli::{LIVELLI, LivelloCasuale, LivelloDef, Modalita};
+use crate::audio::BottoneMuto;
+use crate::livelli::{LIVELLI, LivelloCasuale, LivelloDef, Modalita, Progressione};
 use crate::menu::{AppState, Pausa};
 use crate::personaggi::{PERSONAGGI, battuta_briefing};
 use crate::progressi::{ARGENTO, Medaglia, ORO, Portafoglio, medaglia_per_tempo};
+use crate::squadra::{SBLOCCHI, Squadra, TRATTI, sbloccato};
 use crate::sim::{TICK_MASSIMO, TICK_SECS};
 use crate::ui::{
     BIANCO, CIANO, GIALLO, GRIGIO_MEDIO, GRIGIO_SCAFO, METALLO, NERO, RUGGINE, SCAFO_SCURO, VERDE,
@@ -92,6 +95,11 @@ pub struct BottonePrologo {
     evidenzia: Color,
 }
 
+/// Un ritratto cliccabile del selettore squadra (indice del personaggio).
+/// Solo i personaggi sbloccati lo portano: i bloccati sono bottoni muti.
+#[derive(Component)]
+pub struct RitrattoPlancia(usize);
+
 fn testo(t: impl Into<String>, px: f32, colore: Color) -> impl Bundle {
     (
         Text::new(t),
@@ -143,7 +151,8 @@ fn livello_corrente<'a>(
 }
 
 /// L'overlay esiste solo a prologo acceso, in partita e senza pausa sopra;
-/// si ricostruisce a ogni cambio pagina.
+/// si ricostruisce a ogni cambio pagina e a ogni cambio di squadra (il
+/// selettore mostra bordi e tratti aggiornati).
 #[allow(clippy::too_many_arguments)]
 pub fn sincronizza(
     mut commands: Commands,
@@ -153,6 +162,8 @@ pub fn sincronizza(
     modalita: Res<Modalita>,
     casuale: Res<LivelloCasuale>,
     portafoglio: Res<Portafoglio>,
+    progressione: Res<Progressione>,
+    squadra: Res<Squadra>,
     art: Res<Art>,
     q: Query<Entity, With<SchermataPrologo>>,
 ) {
@@ -162,7 +173,9 @@ pub fn sincronizza(
         && !pausa.aperta
         && dati.is_some();
     let c_e = !q.is_empty();
-    if deve_esserci == c_e && !(deve_esserci && prologo.is_changed()) {
+    if deve_esserci == c_e
+        && !(deve_esserci && (prologo.is_changed() || squadra.is_changed()))
+    {
         return;
     }
     for e in &q {
@@ -195,7 +208,16 @@ pub fn sincronizza(
             if pagina == 0 {
                 pagina_personaggio(r, &art, chi, battuta);
             } else {
-                pagina_obiettivo(r, livello, indice, prologo.con_fumetto, &portafoglio);
+                pagina_obiettivo(
+                    r,
+                    livello,
+                    indice,
+                    prologo.con_fumetto,
+                    &portafoglio,
+                    &progressione,
+                    &squadra,
+                    &art,
+                );
             }
         });
 }
@@ -327,14 +349,19 @@ fn pagina_personaggio(r: &mut ChildSpawnerCommands, art: &Art, chi: usize, battu
 }
 
 /// Pagina 1: il libretto del livello — nome, briefing, obiettivo, numeri,
-/// medaglia in bacheca coi tempi da battere, e "Gioca!". Ha ereditato
-/// tutto ciò che mostrava la vecchia schermata di briefing.
+/// medaglia in bacheca coi tempi da battere, il selettore della squadra e
+/// "Gioca!". Ha ereditato tutto ciò che mostrava la vecchia schermata di
+/// briefing.
+#[allow(clippy::too_many_arguments)]
 fn pagina_obiettivo(
     r: &mut ChildSpawnerCommands,
     livello: &LivelloDef,
     indice: Option<usize>,
     con_fumetto: bool,
     portafoglio: &Portafoglio,
+    progressione: &Progressione,
+    squadra: &Squadra,
+    art: &Art,
 ) {
     let eyebrow = match indice {
         Some(i) => format!("LIVELLO {}", i + 1),
@@ -405,6 +432,96 @@ fn pagina_obiettivo(
             });
         }
     }
+    // ---- chi porti in plancia: il selettore della squadra ----
+    // I ritratti sbloccati (traguardi 10/20/30/40/50) si schierano col
+    // click; il bordo verde è il feedback, la riga sotto elenca i tratti.
+    // Vale anche nel livello casuale: gli sblocchi valgono ovunque.
+    r.spawn((Node {
+        margin: UiRect::top(Val::Px(14.0)),
+        ..default()
+    },))
+    .with_children(|c| {
+        c.spawn(testo("CHI PORTI IN PLANCIA", 13.0, GRIGIO_MEDIO));
+    });
+    r.spawn(Node {
+        flex_direction: FlexDirection::Row,
+        align_items: AlignItems::FlexStart,
+        column_gap: Val::Px(10.0),
+        margin: UiRect::top(Val::Px(6.0)),
+        ..default()
+    })
+    .with_children(|fila| {
+        for (i, personaggio) in PERSONAGGI.iter().enumerate() {
+            let aperto = sbloccato(i, progressione.completati);
+            fila.spawn(Node {
+                flex_direction: FlexDirection::Column,
+                align_items: AlignItems::Center,
+                row_gap: Val::Px(3.0),
+                ..default()
+            })
+            .with_children(|col| {
+                let bordo = if squadra.contiene(i) { VERDE } else { GRIGIO_SCAFO };
+                let mut cella = col.spawn((
+                    Node {
+                        padding: UiRect::all(Val::Px(3.0)),
+                        border: UiRect::all(Val::Px(2.0)),
+                        ..default()
+                    },
+                    BackgroundColor(NERO),
+                    BorderColor::all(bordo),
+                    Button,
+                ));
+                cella.with_children(|dentro| {
+                    dentro.spawn((
+                        ImageNode {
+                            image: art.ritratti[personaggio.ritratto].clone(),
+                            // i bloccati sono smorzati, non nascosti: si
+                            // vede chi manca e cosa c'è da conquistare
+                            color: if aperto { Color::WHITE } else { GRIGIO_MEDIO },
+                            ..default()
+                        },
+                        Node {
+                            width: Val::Px(48.0),
+                            height: Val::Px(48.0),
+                            ..default()
+                        },
+                    ));
+                });
+                if aperto {
+                    cella.insert(RitrattoPlancia(i));
+                } else {
+                    // bottone muto: click inerte e niente suono
+                    cella.insert(BottoneMuto);
+                    col.spawn(testo(format!("liv. {}", SBLOCCHI[i]), 11.0, GRIGIO_SCAFO));
+                }
+            });
+        }
+    });
+    let (riga_tratti, colore_tratti) = if squadra.schierati.is_empty() {
+        (
+            "nessuno in plancia — si può fare, è solo più dura".to_string(),
+            GRIGIO_MEDIO,
+        )
+    } else {
+        (
+            squadra
+                .schierati
+                .iter()
+                .map(|&i| TRATTI[i])
+                .collect::<Vec<_>>()
+                .join("  ·  "),
+            CIANO,
+        )
+    };
+    r.spawn((Node {
+        max_width: Val::Px(600.0),
+        margin: UiRect::top(Val::Px(2.0)),
+        ..default()
+    },))
+    .with_children(|c| {
+        c.spawn(testo(riga_tratti, 13.0, colore_tratti));
+    });
+
     r.spawn(Node {
         height: Val::Px(18.0),
         ..default()
@@ -423,18 +540,26 @@ fn pagina_obiettivo(
     });
 }
 
-/// Click, hover e tastiera dei pulsanti. Invio/Spazio avanzano (e dalla
-/// pagina obiettivo giocano), Backspace/freccia sinistra tornano alla
-/// vignetta — solo quando la vignetta esiste (prima visita del livello);
-/// Esc non si gestisce qui (apre la pausa sopra, voluto). Il suono del
-/// click lo dà già il sistema globale (`audio::suona_click`); gli input di
-/// costruzione sono spenti finché il prologo è aperto, quindi lo Spazio
-/// non avvia anche la simulazione sotto.
+/// Click, hover e tastiera dei pulsanti, e click sui ritratti del
+/// selettore squadra (solo mouse: i numeri sono della palette moduli).
+/// Invio/Spazio avanzano (e dalla pagina obiettivo giocano),
+/// Backspace/freccia sinistra tornano alla vignetta — solo quando la
+/// vignetta esiste (prima visita del livello); Esc non si gestisce qui
+/// (apre la pausa sopra, voluto). Il suono del click lo dà già il sistema
+/// globale (`audio::suona_click`); gli input di costruzione sono spenti
+/// finché il prologo è aperto, quindi lo Spazio non avvia anche la
+/// simulazione sotto.
+#[allow(clippy::type_complexity)]
 pub fn click(
     mut prologo: ResMut<Prologo>,
+    mut squadra: ResMut<Squadra>,
     tasti: Res<ButtonInput<KeyCode>>,
     pausa: Res<Pausa>,
     mut q: Query<(&Interaction, &BottonePrologo, &mut BorderColor), Changed<Interaction>>,
+    mut ritratti: Query<
+        (&Interaction, &RitrattoPlancia, &mut BorderColor),
+        (Changed<Interaction>, Without<BottonePrologo>),
+    >,
 ) {
     for (interazione, b, mut bordo) in &mut q {
         match interazione {
@@ -447,6 +572,21 @@ pub fn click(
             }
             Interaction::Hovered => *bordo = BorderColor::all(b.evidenzia),
             Interaction::None => *bordo = BorderColor::all(GRIGIO_SCAFO),
+        }
+    }
+    // ritratti: schiera/sbarca col click (la ricostruzione dell'overlay
+    // rinfresca bordi e riga dei tratti), bordo bianco al passaggio
+    for (interazione, ritratto, mut bordo) in &mut ritratti {
+        match interazione {
+            Interaction::Pressed => squadra.alterna(ritratto.0),
+            Interaction::Hovered => *bordo = BorderColor::all(BIANCO),
+            Interaction::None => {
+                *bordo = BorderColor::all(if squadra.contiene(ritratto.0) {
+                    VERDE
+                } else {
+                    GRIGIO_SCAFO
+                });
+            }
         }
     }
     if pausa.aperta {

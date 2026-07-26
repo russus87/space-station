@@ -572,6 +572,7 @@ pub fn update_hud(
     modalita: Res<Modalita>,
     casuale: Res<LivelloCasuale>,
     stato_livello: Res<StatoLivello>,
+    stato_bonus: Res<crate::livelli::StatoBonus>,
     moduli: Query<(), With<Module>>,
     mut q: Query<(&CampoHud, &mut Text, &mut TextColor)>,
     mut barra: Query<(&mut Node, &mut BackgroundColor), With<BarraOssigeno>>,
@@ -716,11 +717,26 @@ pub fn update_hud(
                 };
                 match livello {
                     Some(l) => {
+                        // il bonus esiste solo in campagna: vivo finché non
+                        // lo violi, "(perso)" dopo — il colore resta quello
+                        // dell'obiettivo, la riga è una sola
+                        let riga_bonus = match *modalita {
+                            Modalita::Campagna(i) => {
+                                let bonus = crate::livelli::bonus_del_livello(i);
+                                if stato_bonus.violato {
+                                    " · bonus perso".to_string()
+                                } else {
+                                    format!(" · bonus: {}", bonus.descrizione())
+                                }
+                            }
+                            _ => String::new(),
+                        };
                         t.0 = format!(
-                            "{}   moduli {}/{}",
+                            "{}   moduli {}/{}{}",
                             l.obiettivo.progresso(&sim, &stato_livello),
                             moduli.iter().count(),
-                            l.max_moduli
+                            l.max_moduli,
+                            riga_bonus
                         );
                         c.0 = if stato_livello.completato { VERDE } else { GIALLO };
                     }
@@ -820,6 +836,7 @@ pub fn registro(
 /// l'inventario O l'applicabilità: ogni tipo posseduto è un bottone-icona
 /// col suo tooltip; le scorte che ADESSO non servono sono smorzate, mute
 /// e inerti. A magazzino vuoto la fila è vuota (zero ingombro).
+#[allow(clippy::too_many_arguments)]
 pub fn update_scorte_hud(
     mut commands: Commands,
     portafoglio: Res<crate::progressi::Portafoglio>,
@@ -1007,9 +1024,14 @@ pub fn update_ispezione(
                         ),
                         GIALLO,
                     ),
-                    Some(Fermo::Avaria) => {
-                        ("IN AVARIA — premi R per riparare".to_string(), ROSSO)
-                    }
+                    Some(Fermo::Avaria) if m.in_riparazione() => (
+                        format!("IN RIPARAZIONE — mancano {} tick", m.riparazione),
+                        GIALLO,
+                    ),
+                    Some(Fermo::Avaria) => (
+                        "IN AVARIA — premi R per riparare (2 di equipaggio)".to_string(),
+                        ROSSO,
+                    ),
                 };
                 t.0 = s;
                 c.0 = col;
