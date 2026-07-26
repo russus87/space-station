@@ -40,7 +40,8 @@ pub struct RadiceGioco;
 #[derive(Component)]
 pub struct BottoneMenu;
 
-/// Il tasto MERCATO nell'HUD: apre il mercato, come M (vedi mercato.rs).
+/// Il tasto SCORTE nell'HUD: apre l'inventario delle scorte, come M
+/// (vedi mercato.rs; si comprano nel Marketplace dal titolo).
 #[derive(Component)]
 pub struct BottoneMercato;
 
@@ -554,6 +555,10 @@ pub fn update_hud(
                             c.0 = BIANCO;
                         }
                     }
+                    // il moltiplicatore di velocità si vede accanto al tempo
+                    if sim.velocita > 1 {
+                        t.0.push_str(&format!("  ×{}", sim.velocita));
+                    }
                 } else if sim.tick == 0 && !moduli.is_empty() {
                     // playtest: a stazione costruita, "PAUSA" non spiegava il
                     // passo successivo. Prima del primo avvio il campo diventa
@@ -662,13 +667,20 @@ pub fn update_hud(
 }
 
 pub fn update_palette(
+    mut commands: Commands,
     sel: Res<Selected>,
     progressione: Res<Progressione>,
-    mut slot_q: Query<(&SlotPalette, &mut BackgroundColor, &mut BorderColor)>,
+    mut slot_q: Query<(Entity, &SlotPalette, &mut BackgroundColor, &mut BorderColor)>,
     mut costi_q: Query<(&CostoSlot, &mut Text, &mut TextColor)>,
 ) {
-    for (slot, mut bg, mut bordo) in &mut slot_q {
+    for (entita, slot, mut bg, mut bordo) in &mut slot_q {
         let bloccato = progressione.completati < KINDS[slot.0].def().sblocco;
+        // uno slot bloccato è anche muto: il click negato non deve suonare
+        if bloccato {
+            commands.entity(entita).insert(crate::audio::BottoneMuto);
+        } else {
+            commands.entity(entita).remove::<crate::audio::BottoneMuto>();
+        }
         let scelto = !bloccato && KINDS[slot.0] == sel.0;
         bg.0 = if scelto {
             GRIGIO_SCAFO

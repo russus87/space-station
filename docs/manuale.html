@@ -397,7 +397,7 @@ hr.torn{
 
 <!-- ============ COVER ============ -->
 <header class="cover">
-  <div class="kicker">manuale operativo di bordo — edizione v0.4</div>
+  <div class="kicker">manuale operativo di bordo — edizione v0.6</div>
   <h1 class="zine-title">
     <span class="blob" style="background:var(--orange); width:260px;height:150px; left:-30px; top:-10px;"></span>
     <span class="blob" style="background:var(--cyan); width:180px;height:120px; right:-20px; bottom:-20px;"></span>
@@ -541,7 +541,10 @@ hr.torn{
     Livello casuale la partita si chiude comunque a 400 tick — e nell'HUD
     è un orologio vero, che scende da <b>TEMPO 4:40</b>: bianco finché
     c'è margine, poi giallo, poi rosso negli ultimi respiri ("TEMPO
-    SCADUTO" a zero). Solo l'Infinita non ha orologio.</p>
+    SCADUTO" a zero). Solo l'Infinita non ha orologio. Il tasto
+    <span class="key">V</span> cicla la <b>velocità di gioco</b> ×1 → ×2 →
+    ×4 → ×1: si vede subito accanto al timer, e non cambia una sola regola
+    — solo quanto in fretta scorrono i tick.</p>
   </div>
 
   <figure class="shot r2">
@@ -742,7 +745,8 @@ hr.torn{
     <img class="sprite" src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAGAAAABgCAYAAADimHc4AAACDUlEQVR42u3dwU3DUAzG8d6ROHHiwgBIHDsBI7AAGzAIC7ABW0IvRO9QI7/YzrPrvyXfqkr5fmmcl6TK6URRFEVRFEUtqrv7h58VTfIAAEDQl/78+j6s394/tm6HAQAAPQBmgx5DkXr281K/nF+3ljDKwwAAQD8Ar6BX9QgzdhkMAAAA4BqAdByXNnj22D0bqKal70k9JwAAoB+AJnTNhlkwvGAseMswAACgH4Am9NmNf3x63jpiNljmgSZ0AAAAIBTAcqyXPjOGLrXXajYi9DLDFgAAegB4zYCIa/3lMQAAoB+AV+heF9eOPO7PooY8BAYAAADsBbCcqmY43UwxMwAAoB+A14o3W+gZ8AAAAIDdAJZTtIjbh16tuQ+RYvACAEAPgIhbj+NGar7nyNCl1jxANot66DoAAAAAuHas15zazs4bC57XziFBAgAAAO4r4eh/pBzZ0j95LLNk2V4PAAD1ATpjeJ3CAgAAAO4AUlsuzFkAIi4IpggdAAAA2IsUcUyXnhmNvt2oCT0FBgAAAPDX0c9izt4ivdnQAQCgN4AU+q2ubMvs9QAAAEAFgJKhAwAAAJGnoZlD1zw/mu7XAAAA/QAyYIxzKDrodDMAAAD6AXjNhlUX1MoHDQAAAKyeE16r2XZvVAIAgN6vOLTAlFy1AgAAAJ1mBq+wBQAAABa+dZvEAACAoiiK+rd+ASpMbNe6rf38AAAAAElFTkSuQmCC" alt="Detrito">
     <div class="txt">
       <b>I detriti.</b> Rocce alla deriva che occupano celle della griglia:
-      non ci si costruisce, non si rimuovono (tranne che con la Gru). Non
+      non ci si costruisce, non si rimuovono da soli (tranne che con la
+      Gru, o con la Sonda demolitrice del Marketplace — capitolo 5). Non
       consumano niente e non fanno niente — ti tolgono solo lo spazio, che
       a fine campagna è la risorsa più preziosa di tutte.
       <div class="log-line">"Detriti sulla griglia: costruisci intorno"</div>
@@ -768,13 +772,24 @@ hr.torn{
       arrivi), una pagina a testa per chi ha qualcosa da dire; le battute
       dei briefing fanno il resto, una scheggia per volta, fino a un finale
       che chiude i conti di tutti.</p>
-      <p>E prima ancora del briefing scritto, ogni livello — campagna o
-      casuale — apre il sipario: la griglia si scurisce e il personaggio di
-      turno compare a figura intera dentro una nuvola di fumetto vera, coda
-      a pallini compresa. Il bottone <b>Avanti</b> gira pagina e mostra
-      l'obiettivo, poi non resta che <b>Gioca!</b> Il fumetto è il sipario,
-      non il libretto d'istruzioni — quello resta nell'HUD, dove serve
-      davvero.</p>
+      <p>E prima ancora del briefing scritto, la <b>prima volta</b> che
+      incontri un livello — campagna o casuale — si apre il sipario: la
+      griglia si scurisce e il personaggio di turno compare a figura intera
+      dentro una nuvola di fumetto vera, coda a pallini compresa. Si naviga
+      a mouse o a tastiera (<span class="key">Invio</span> o
+      <span class="key">Spazio</span> avanti, <span class="key">Backspace</span>
+      indietro): il bottone <b>Avanti</b> gira pagina e mostra l'obiettivo,
+      poi non resta che <b>Gioca!</b> Rigiocando lo stesso livello con
+      "Riprova il livello" il sipario non si alza una seconda volta — dritti
+      al cantiere. Il fumetto è il sipario, non il libretto d'istruzioni —
+      quello resta nell'HUD, dove serve davvero.</p>
+      <p>Una volta in partita, i cinque non stanno zitti: commentano a
+      caldo i momenti che contano — il primo blackout, la prima avaria, il
+      primo arrivo di coloni, l'ossigeno critico, un detrito rimosso, il
+      timer agli sgoccioli, l'oro appena conquistato — con un mini-fumetto
+      che compare in basso a destra per pochi secondi e poi sparisce da
+      solo. Sono chiose, non alert: il registro eventi resta il posto dove
+      guardare per i fatti.</p>
     </div>
     <div class="side">
       <div class="callout ok">
@@ -942,10 +957,14 @@ hr.torn{
         il <b>40%</b> del tempo limite e prendi l'<b>oro</b>, entro il
         <b>70%</b> l'<b>argento</b>, entro il tetto il <b>rame</b>. Nella
         griglia di selezione il numero del livello si colora di
-        conseguenza (oro = giallo, argento = bianco, rame = ruggine) e la
-        prima volta che migliori una medaglia incassi crediti — pochi,
-        apposta: rame 1, argento 2, oro 3. Si spendono al Marketplace,
-        capitolo 5.</p>
+        conseguenza (oro = giallo, argento = bianco, rame = ruggine), il
+        saldo crediti è scritto lì accanto, e la prima volta che migliori
+        una medaglia incassi crediti — pochi, apposta: rame 1, argento 2,
+        oro 3. Si spendono al Marketplace, capitolo 5. Il briefing di un
+        livello già tentato mostra la medaglia che hai già in bacheca e i
+        tempi esatti da battere per la prossima — e se in partita conquisti
+        l'oro parte un jingle tutto suo, diverso dalla solita fanfara di
+        fine livello.</p>
       </div>
       <p style="font-size:0.86rem; color:var(--dim)">Tutto si salva in file
       di testo semplici in
@@ -995,9 +1014,13 @@ hr.torn{
   <p>In partita premi <span class="key">M</span> (o il bottone
   <b>SCORTE</b> nell'HUD) per aprire l'inventario di quello che hai in
   magazzino: un click su una scorta la consuma e ne applica subito
-  l'effetto. Una scorta che qui non servirebbe a niente (ampliamento senza
-  budget moduli, sonda senza detriti da demolire) si mostra spenta col
-  motivo, così non la sprechi per errore.</p>
+  l'effetto. Le scorte non si sprecano <b>mai</b>: quella che qui non
+  avrebbe effetto — coloni senza posti letto liberi, ossigeno con la
+  riserva già al massimo, spurgo senza surriscaldamento accumulato,
+  riparazione senza nessuna avaria in corso, ampliamento stiva senza un
+  budget moduli da ampliare, sonda senza detriti da demolire — si mostra
+  spenta col motivo scritto lì accanto e semplicemente non si consuma: il
+  click su una scorta spenta non fa nulla, il magazzino resta intatto.</p>
 
   <div class="callout info">
     <div class="sticker">nessun euro coinvolto</div>
@@ -1009,21 +1032,29 @@ hr.torn{
     livelli, non li regala.</p>
   </div>
 
+  <p style="font-size:0.86rem; color:var(--dim)">Nella schermata Marketplace
+  ogni facility è una card quadrata con icona pixel-art: <b>dorata</b> se il
+  saldo crediti basta a comprarla, spenta in grigio se no, col prezzo
+  segnato in monete (una per credito) e quante ne possiedi già scritto
+  sotto il nome.</p>
+
   <div class="tag-grid">
     <div class="tag">
       <div class="price">2 <span>crediti</span></div>
       <h4>Scorta d'ossigeno</h4>
-      <p>Riserva d'ossigeno subito al massimo.</p>
+      <p>Riserva d'ossigeno subito al massimo <i>(solo se non è già
+      piena)</i>.</p>
     </div>
     <div class="tag">
       <div class="price">2 <span>crediti</span></div>
       <h4>Spurgo termico</h4>
-      <p>Azzera il surriscaldamento accumulato.</p>
+      <p>Azzera il surriscaldamento accumulato <i>(solo se ce n'è)</i>.</p>
     </div>
     <div class="tag">
       <div class="price">3 <span>crediti</span></div>
       <h4>Squadra di riparazione</h4>
-      <p>Ripara tutte le avarie in un colpo.</p>
+      <p>Ripara tutte le avarie in un colpo <i>(solo se un modulo è in
+      avaria)</i>.</p>
     </div>
     <div class="tag">
       <div class="price">3 <span>crediti</span></div>
@@ -1033,7 +1064,8 @@ hr.torn{
     <div class="tag">
       <div class="price">4 <span>crediti</span></div>
       <h4>Trasporto coloni</h4>
-      <p>+2 equipaggio subito, se ci sono posti letto.</p>
+      <p>+2 equipaggio subito, se ci sono posti letto <i>(solo se ce ne
+      sono di liberi)</i>.</p>
     </div>
     <div class="tag">
       <div class="price">5 <span>crediti</span></div>
@@ -1062,12 +1094,19 @@ hr.torn{
         <tr><td><span class="key">R</span></td><td>ripara il modulo in avaria sotto il cursore</td></tr>
         <tr><td><span class="key">Spazio</span></td><td>avvia/ferma la simulazione (da fermi si costruisce senza conseguenze, l'HUD mostra l'anteprima)</td></tr>
         <tr><td><span class="key">M</span></td><td>apre le scorte (il Marketplace si compra dal menu principale)</td></tr>
+        <tr><td><span class="key">V</span></td><td>cicla la velocità di gioco ×1 / ×2 / ×4, mostrata accanto al timer</td></tr>
         <tr><td><span class="key">Esc</span></td><td>menu di pausa (congela anche il tempo) — anche col bottone MENU nell'HUD</td></tr>
         <tr><td>frecce + <span class="key">Invio</span></td><td>navigano i menu</td></tr>
         <tr><td>frecce nella griglia livelli</td><td>su/giù cambia riga, sinistra/destra cella</td></tr>
+        <tr><td><span class="key">Invio</span> / <span class="key">Backspace</span></td><td>nel sipario del prologo: avanti / indietro di pagina</td></tr>
+        <tr><td><span class="key">F12</span></td><td>screenshot della finestra, in qualunque schermata</td></tr>
       </table>
     </div>
   </div>
+  <div class="note">Anche il cursore parla: nei menu è la solita freccia
+  pixel-art, ma appena entri in partita diventa un <b>mirino</b> — stesso
+  stile, disegno diverso — per dirti che ora quel puntino sulla griglia è
+  la cella su cui stai per costruire.</div>
 </section>
 
 <hr class="torn">

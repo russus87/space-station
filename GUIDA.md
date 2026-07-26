@@ -109,9 +109,10 @@ peggio.
 - **In alto**: l'HUD con le quattro risorse. Per ciascuna vedi produzione e
   consumo a confronto, e il margine colorato: verde va bene, giallo è un
   avvertimento, rosso è un'emergenza. In fondo alla barra, il punteggio.
-- **A sinistra**: la palette dei sei moduli (tasti 1–6) con i loro costi, e
-  sotto il pannello ispezione: punta un modulo col mouse e leggi cosa fa,
-  in che stato è e perché.
+- **A sinistra**: la palette degli undici moduli (tasti 1–6 e 7 8 9 0 C;
+  gli sbloccabili mostrano "si sblocca al livello N" finché non li
+  conquisti) con i loro costi, e sotto il pannello ispezione: punta un
+  modulo col mouse e leggi cosa fa, in che stato è e perché.
 - **Al centro**: la griglia 14×8 dove costruisci.
 - **In basso**: il registro eventi. Ogni cosa che succede — un blackout,
   un'avaria, un morto — scrive una riga qui. È lo strumento principale per
@@ -139,8 +140,16 @@ con il 2). Un modulo fermo mostra un simbolo che dice il perché:
 | `R` | Ripara il modulo in avaria sotto il cursore (gratis) |
 | `M` | Apre le scorte: le facilities comprate nel Marketplace (dal titolo) coi crediti delle medaglie |
 | `Spazio` | Avvia/ferma la simulazione |
+| `V` | Cambia la velocità di gioco: ×1 → ×2 → ×4 (stesse regole, tick più rapidi; l'HUD mostra ×2/×4) |
 | `Esc` | Apre il menu di pausa (riprendi, volumi di musica ed effetti, ricomincia, torna al titolo) |
 | `F12` | Salva uno screenshot nella cartella corrente |
+
+All'ingresso in un livello (campagna o casuale) c'è un **prologo a
+fumetto**: compare solo la **prima volta** che incontri quel livello e si
+naviga anche con `Invio` (avanti / Gioca!) e `Backspace` (indietro).
+Durante la partita i personaggi **commentano gli eventi chiave** (primo
+blackout, prima avaria, ossigeno critico…) con un mini-fumetto sopra il
+log: sparisce da solo dopo qualche secondo.
 
 Per moduli sbloccabili, personaggi, storia e mercato nel dettaglio c'è il
 **MANUALE.md** — questa guida copre le basi.
@@ -182,18 +191,25 @@ comune su tutta la stazione.
 | Calore | Se ne produci più di quanto ne dissipi, dopo 6 tick un modulo a caso va in avaria |
 | Equipaggio | Arriva da solo se ci sono posti letto e aria buona; serve ai laboratori per lavorare. **Se torna a zero la partita è persa** |
 
-## I sei moduli
+## Gli undici moduli
 
-Valori per tick di simulazione.
+Valori per tick di simulazione. I primi sei sono disponibili da subito;
+gli altri cinque si **sbloccano completando i livelli** di campagna
+indicati (e una volta conquistati valgono in tutte le modalità).
 
-| Tasto | Modulo | Energia | Ossigeno | Calore | Equipaggio | In blackout si spegne |
+| Tasto | Modulo | Energia | Ossigeno | Calore | Note | Sblocco |
 |---|---|---|---|---|---|---|
-| 1 | Reattore | +100 | 0 | +40 | — | mai (è il produttore) |
-| 2 | Life Support | −30 | +50 | +5 | — | per ultimo |
-| 3 | Dormitorio | −10 | 0 | +2 | +4 posti letto | 2º |
-| 4 | Laboratorio | −40 | 0 | +25 | richiede 2 | per primo |
-| 5 | Radiatore | −5 | 0 | −50 | — | 4º |
-| 6 | Corridoio | −1 | 0 | 0 | — | 3º |
+| 1 | Reattore | +100 | 0 | +40 | accende la sua rete | — |
+| 2 | Life Support | −30 | +50 | +5 | si spegne per ultimo | — |
+| 3 | Dormitorio | −10 | 0 | +2 | +4 posti letto | — |
+| 4 | Laboratorio | −40 | 0 | +25 | richiede 2 di equipaggio; si spegne per primo | — |
+| 5 | Radiatore | −5 | 0 | −50 | — | — |
+| 6 | Corridoio | −1 | 0 | 0 | collega, si orienta da solo | — |
+| 7 | Batteria | 0 | 0 | +2 | accumula 150, copre i deficit di rete | livello 5 |
+| 8 | Serra | −10 | +20 | +8 | ossigeno efficiente per energia | livello 15 |
+| 9 | Gru | −20 | 0 | +5 | 12 tick e rimuove un detrito adiacente, poi si smonta | livello 25 |
+| 0 | Condotto termico | −15 | 0 | −90 | radiatore pesante | livello 35 |
+| C | Centro comando | −25 | 0 | +5 | max 1: arrivi ogni 2 tick invece di 4 | livello 45 |
 
 Note:
 - Un laboratorio **senza i suoi 2 membri di equipaggio non lavora e non

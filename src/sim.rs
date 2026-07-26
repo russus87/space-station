@@ -86,6 +86,9 @@ pub struct Sim {
     pub running: bool,
     pub tick: u64,
     pub timer: Timer,
+    /// Moltiplicatore del metronomo (1, 2 o 4): cambia solo quanto in
+    /// fretta passano i tick reali, mai le regole. Torna a 1 a ogni reset.
+    pub velocita: u32,
     pub ossigeno: f32,
     pub equipaggio: u32,
     pub surriscaldamento: u32,
@@ -145,6 +148,7 @@ impl Default for Sim {
             running: false,
             tick: 0,
             timer: Timer::from_seconds(TICK_SECS, TimerMode::Repeating),
+            velocita: 1,
             ossigeno: O2_MAX,
             equipaggio: 0,
             surriscaldamento: 0,
@@ -227,6 +231,52 @@ impl EventLog {
     }
 }
 
+/// `V` cicla la velocità di gioco 1× → 2× → 4× → 1×. La pausa Esc congela
+/// comunque tutto (il chiamante registra questo sistema con le stesse
+/// condizioni degli altri input di partita); qui si controlla solo che il
+/// menu non sia aperto per non cambiare velocità alla cieca.
+pub fn tasto_velocita(
+    tasti: Res<ButtonInput<KeyCode>>,
+    pausa: Res<crate::menu::Pausa>,
+    mut sim: ResMut<Sim>,
+    mut log: ResMut<EventLog>,
+) {
+    if pausa.aperta || !tasti.just_pressed(KeyCode::KeyV) {
+        return;
+    }
+    sim.velocita = match sim.velocita {
+        1 => 2,
+        2 => 4,
+        _ => 1,
+    };
+    let tick = sim.tick;
+    let velocita = sim.velocita;
+    log.info(tick, format!("Velocità ×{velocita}"));
+}
+
+/// Quanto una rete attinge dalle batterie e quanto surplus resta per
+/// ricaricarle, dati l'accumulo iniziale offerto dalle batterie e il
+/// residuo del pool dopo la distribuzione. Pura, testata.
+fn bilancio_batterie_rete(accumulo: f32, residuo: f32) -> (f32, f32) {
+    ((accumulo - residuo).max(0.0), (residuo - accumulo).max(0.0))
+}
+
+/// Un passo del regolamento per UNA batteria della sua rete: prima cede
+/// quanto la rete ha attinto (fino alla carica disponibile), poi si
+/// ricarica dal surplus rispettando il tetto per tick e la capienza.
+/// Sequenziale in ordine di costruzione: la prima batteria si svuota e si
+/// riempie per prima. Pura, testata.
+fn regola_batteria(carica: &mut f32, da_scalare: &mut f32, surplus: &mut f32) {
+    let prelievo = da_scalare.min(*carica);
+    *carica -= prelievo;
+    *da_scalare -= prelievo;
+    let ricarica = surplus
+        .min(RICARICA_BATTERIA)
+        .min(CAPIENZA_BATTERIA - *carica);
+    *carica += ricarica;
+    *surplus -= ricarica;
+}
+
 pub fn sim_tick(
     time: Res<Time>,
     mut sim: ResMut<Sim>,
@@ -237,6 +287,13 @@ pub fn sim_tick(
     // fotografa lo stato, non deve continuare a evolvere sotto.
     if sim.partita_finita {
         return;
+    }
+    // la velocità di gioco scala solo il metronomo: stessi tick, più rapidi.
+    // set_duration preserva l'elapsed, quindi il cambio non perde il colpo
+    // in corso né lo riavvia da capo.
+    let durata = std::time::Duration::from_secs_f32(TICK_SECS / sim.velocita as f32);
+    if sim.timer.duration() != durata {
+        sim.timer.set_duration(durata);
     }
     sim.timer.tick(time.delta());
     if !sim.timer.just_finished() {
@@ -415,23 +472,15 @@ pub fn sim_tick(
     // il surplus vero dei generatori le ricarica (max RICARICA_BATTERIA a
     // testa per tick). In anteprima (pausa) le cariche non si toccano.
     if vivo {
-        let mut da_scalare: Vec<f32> = (0..n_comp)
-            .map(|c| (accumulo[c] - pool[c]).max(0.0))
-            .collect();
-        let mut surplus: Vec<f32> = (0..n_comp)
-            .map(|c| (pool[c] - accumulo[c]).max(0.0))
-            .collect();
+        let (mut da_scalare, mut surplus): (Vec<f32>, Vec<f32>) = (0..n_comp)
+            .map(|c| bilancio_batterie_rete(accumulo[c], pool[c]))
+            .unzip();
         for (i, m) in mods.iter_mut().enumerate() {
             if m.broken || m.kind != ModuleKind::Batteria || !con_reattore[comp[i]] {
                 continue;
             }
             let c = comp[i];
-            let prelievo = da_scalare[c].min(m.carica);
-            m.carica -= prelievo;
-            da_scalare[c] -= prelievo;
-            let ricarica = surplus[c].min(RICARICA_BATTERIA).min(CAPIENZA_BATTERIA - m.carica);
-            m.carica += ricarica;
-            surplus[c] -= ricarica;
+            regola_batteria(&mut m.carica, &mut da_scalare[c], &mut surplus[c]);
         }
     }
     // margine = surplus reale dei generatori (negativo quando le reti
@@ -601,5 +650,147 @@ pub fn sim_tick(
             Gravita::Allarme,
             format!("Tempo scaduto: {tetto} tick raggiunti"),
         );
+    }
+}
+
+// ---------------- test ----------------
+
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    // --- regolamento batterie: le funzioni pure ---
+
+    #[test]
+    fn bilancio_rete_separa_prelievo_e_surplus() {
+        assert_eq!(bilancio_batterie_rete(100.0, 60.0), (40.0, 0.0)); // deficit
+        assert_eq!(bilancio_batterie_rete(100.0, 130.0), (0.0, 30.0)); // surplus
+        assert_eq!(bilancio_batterie_rete(0.0, 0.0), (0.0, 0.0));
+    }
+
+    #[test]
+    fn scarica_parziale_e_totale_in_ordine_di_costruzione() {
+        // due batterie (100 e 30), la rete ha attinto 110: la prima si
+        // svuota, la seconda cede 10 e resta a 20
+        let (mut a, mut b) = (100.0, 30.0);
+        let (mut da_scalare, mut surplus) = (110.0, 0.0);
+        regola_batteria(&mut a, &mut da_scalare, &mut surplus);
+        regola_batteria(&mut b, &mut da_scalare, &mut surplus);
+        assert_eq!((a, b), (0.0, 20.0));
+        assert_eq!(da_scalare, 0.0);
+    }
+
+    #[test]
+    fn ricarica_rispetta_il_tetto_per_tick_e_la_capienza() {
+        // surplus abbondante: si carica di RICARICA_BATTERIA e basta
+        let mut carica = 0.0;
+        let (mut da_scalare, mut surplus) = (0.0, 100.0);
+        regola_batteria(&mut carica, &mut da_scalare, &mut surplus);
+        assert_eq!(carica, RICARICA_BATTERIA);
+        assert_eq!(surplus, 100.0 - RICARICA_BATTERIA);
+        // quasi piena: si ferma alla capienza, non oltre
+        let mut piena = CAPIENZA_BATTERIA - 5.0;
+        let (mut da_scalare, mut surplus) = (0.0, 100.0);
+        regola_batteria(&mut piena, &mut da_scalare, &mut surplus);
+        assert_eq!(piena, CAPIENZA_BATTERIA);
+    }
+
+    // --- sim_tick vero, in un World in miniatura ---
+
+    fn modulo(kind: ModuleKind, x: i32, seq: u32) -> Module {
+        Module {
+            kind,
+            etichetta: format!("{:?} {seq}", kind),
+            cella: IVec2::new(x, 0),
+            seq,
+            powered: true,
+            broken: false,
+            staffed: true,
+            collegato: true,
+            carica: 0.0,
+            lavoro: 0,
+        }
+    }
+
+    fn mondo_con(moduli: Vec<Module>) -> (World, Schedule) {
+        let mut world = World::new();
+        let mut sim = Sim::default();
+        sim.running = true;
+        world.insert_resource(sim);
+        world.insert_resource(EventLog::default());
+        world.insert_resource(Time::<()>::default());
+        for m in moduli {
+            world.spawn(m);
+        }
+        let mut schedule = Schedule::default();
+        schedule.add_systems(sim_tick);
+        (world, schedule)
+    }
+
+    fn un_tick(world: &mut World, schedule: &mut Schedule) {
+        world
+            .resource_mut::<Time>()
+            .advance_by(std::time::Duration::from_secs_f32(TICK_SECS + 0.05));
+        schedule.run(world);
+    }
+
+    #[test]
+    fn la_batteria_copre_il_deficit_senza_blackout_e_il_margine_va_sotto_zero() {
+        // reattore 100 contro 4 life support (-120): deficit 20, la
+        // batteria carica lo copre — nessun blackout, margine negativo
+        let mut batteria = modulo(ModuleKind::Batteria, 1, 1);
+        batteria.carica = CAPIENZA_BATTERIA;
+        let mut moduli = vec![modulo(ModuleKind::Reattore, 0, 0), batteria];
+        for i in 0..4 {
+            moduli.push(modulo(ModuleKind::LifeSupport, 2 + i, 2 + i as u32));
+        }
+        let (mut world, mut schedule) = mondo_con(moduli);
+        un_tick(&mut world, &mut schedule);
+        {
+            let sim = world.resource::<Sim>();
+            assert!(!sim.in_blackout, "la batteria doveva coprire il deficit");
+            assert!(sim.energia_margine < 0.0, "margine {}", sim.energia_margine);
+        }
+        let mut q = world.query::<&Module>();
+        let carica: f32 = q
+            .iter(&world)
+            .filter(|m| m.kind == ModuleKind::Batteria)
+            .map(|m| m.carica)
+            .sum();
+        assert_eq!(carica, CAPIENZA_BATTERIA - 20.0);
+        // e ogni life support è rimasto acceso
+        assert!(
+            q.iter(&world)
+                .filter(|m| m.kind == ModuleKind::LifeSupport)
+                .all(|m| m.powered)
+        );
+    }
+
+    #[test]
+    fn una_rete_senza_reattore_lascia_la_batteria_inerte() {
+        let mut batteria = modulo(ModuleKind::Batteria, 0, 0);
+        batteria.carica = 80.0;
+        let moduli = vec![batteria, modulo(ModuleKind::LifeSupport, 1, 1)];
+        let (mut world, mut schedule) = mondo_con(moduli);
+        un_tick(&mut world, &mut schedule);
+        let mut q = world.query::<&Module>();
+        let batteria = q.iter(&world).find(|m| m.kind == ModuleKind::Batteria).unwrap();
+        assert_eq!(batteria.carica, 80.0, "la carica non doveva muoversi");
+        let ls = q.iter(&world).find(|m| m.kind == ModuleKind::LifeSupport).unwrap();
+        assert!(!ls.collegato && !ls.powered);
+    }
+
+    #[test]
+    fn col_surplus_la_batteria_si_carica_di_quindici_per_tick() {
+        let moduli = vec![
+            modulo(ModuleKind::Reattore, 0, 0),
+            modulo(ModuleKind::Batteria, 1, 1),
+        ];
+        let (mut world, mut schedule) = mondo_con(moduli);
+        un_tick(&mut world, &mut schedule);
+        un_tick(&mut world, &mut schedule);
+        let mut q = world.query::<&Module>();
+        let batteria = q.iter(&world).find(|m| m.kind == ModuleKind::Batteria).unwrap();
+        assert_eq!(batteria.carica, 2.0 * RICARICA_BATTERIA);
     }
 }

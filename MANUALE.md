@@ -1,6 +1,6 @@
 # SPACE STATION — Manuale di gioco
 
-*Manuale operativo di bordo, edizione v0.4 — da leggere prima del primo
+*Manuale operativo di bordo, edizione v0.6 — da leggere prima del primo
 turno in cabina di comando. O durante. Nessuno ti giudica.*
 
 ---
@@ -128,9 +128,12 @@ degli archi la trova in `STORIA.md` — ma è più bello scoprirla giocando.
 
 Cinque persone ti accompagnano per tutta la campagna: nei briefing di
 **ogni** livello parla uno di loro, e a ogni traguardo uno ti consegna un
-modulo nuovo. Sono tutti, per motivi propri, legati alla Vecchia.
-Ascoltali: sotto la battuta c'è sempre un'istruzione — e sotto
-l'istruzione, quasi sempre, un ricordo.
+modulo nuovo. E non spariscono quando si gioca: agli **eventi chiave**
+della partita (il primo blackout, la prima avaria, l'ossigeno critico,
+un oro conquistato…) uno di loro commenta con un mini-fumetto sopra il
+registro eventi, che sparisce da solo. Sono tutti, per motivi propri,
+legati alla Vecchia. Ascoltali: sotto la battuta c'è sempre
+un'istruzione — e sotto l'istruzione, quasi sempre, un ricordo.
 
 ### <img src="docs/img/ingegnere.png" width="96"><br>Vera — Ingegnera di bordo
 
@@ -244,13 +247,20 @@ su/giù saltano di riga, sinistra/destra di casella.
 
 All'avvio del livello la griglia si oscura e il personaggio di turno ti
 accoglie con un **fumetto a tutto schermo**: "Avanti" mostra l'obiettivo,
-"Gioca!" ti lascia al cantiere.
+"Gioca!" ti lascia al cantiere. Compare solo la **prima volta** che
+incontri quel livello (al decimo "Riprova" il sipario non serve più) e si
+naviga anche da tastiera (`Invio` avanti/Gioca!, `Backspace` indietro).
+Il briefing ti dice anche la **medaglia già presa** sul livello e i tempi
+da battere per migliorarla.
 
 **Il tempo è una risorsa.** Il tetto della partita si legge come un
 **timer** nell'HUD (`TEMPO 4:40`, che ingiallisce e poi arrossisce), e la
 velocità paga: completare il livello entro il **40%** del tempo vale la
 **medaglia d'oro**, entro il **70%** l'**argento**, entro il limite il
-**rame**. La medaglia colora il numero del livello nella griglia di
+**rame**. Col tasto `V` acceleri lo scorrere reale dei tick (×2/×4) senza
+toccare le regole — il timer di gioco conta i tick, non i tuoi secondi,
+quindi la velocità non cambia la medaglia: cambia solo quanto aspetti.
+La medaglia colora il numero del livello nella griglia di
 selezione (oro, bianco-argento, ruggine) e frutta **crediti** per il
 Marketplace — una tantum, solo quando migliori: rame 1, argento 2, oro 3.
 Pochi, di proposito.
@@ -263,8 +273,11 @@ Dal **titolo** si apre il **Marketplace**: il catalogo delle facilities,
 che si compra coi **crediti delle medaglie** (§4). Quello che compri
 diventa **scorta** persistente; in partita premi **M** (o il bottone
 SCORTE nell'HUD) per aprire l'inventario e **usare** una scorta — che si
-consuma. Le scorte senza senso nel contesto (l'ampliamento stiva dove non
-c'è budget, la sonda senza detriti) restano in magazzino, spente.
+consuma. Una scorta che qui non servirebbe **non si può sprecare**: resta
+in magazzino, spenta, col motivo scritto accanto — l'ampliamento stiva
+dove non c'è budget, la sonda senza detriti, i coloni senza posti letto
+liberi, l'ossigeno a riserva già piena, lo spurgo senza surriscaldamento,
+la squadra di riparazione senza avarie.
 
 *Nessuna valuta reale, nessuna transazione: i crediti si guadagnano solo
 giocando, tutto è gratis nel mondo vero.*
@@ -294,9 +307,11 @@ risolve mezzo livello, deve costare mezze campagne.
 | click destro | rimuove il modulo sulla cella |
 | `R` | ripara il modulo in avaria sotto il cursore |
 | `Spazio` | avvia/ferma la simulazione (da fermi si costruisce senza conseguenze, l'HUD mostra l'anteprima) |
+| `V` | velocità di gioco: ×1 → ×2 → ×4 (stessi tick, più rapidi; l'HUD lo mostra accanto al timer; torna a ×1 a ogni partita) |
 | `M` | apre le scorte comprate nel Marketplace |
 | `Esc` | menu di pausa (congela anche il tempo) — anche col bottone MENU nell'HUD |
-| frecce + `Invio` | navigano i menu |
+| `F12` | salva uno screenshot nella cartella corrente |
+| frecce + `Invio` | navigano i menu (`Invio`/`Backspace` avanzano e arretrano anche il prologo) |
 | frecce nella griglia livelli | su/giù cambia riga, sinistra/destra cella |
 
 ---

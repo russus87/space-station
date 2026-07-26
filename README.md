@@ -16,7 +16,9 @@ moduli per livello; completarne uno sblocca il successivo), l'**Infinita**
 l'Infinita ma con un tetto di 400 tick: partite brevi e confrontabili) e
 il **Livello casuale** (generato al momento, fuori da progressione e
 classifiche). Infinita e Sfida hanno ciascuna la propria **classifica**
-locale top 10. Classifiche e
+locale top 10. In campagna il tempo fa le **medaglie** (oro/argento/rame
+sulle soglie 40%/70%/100% del limite) che fruttano crediti da spendere nel
+**Marketplace** — scorte una tantum da usare in partita, mai valuta reale. Classifiche e
 progressione della campagna sono file di testo semplice in
 `$XDG_DATA_HOME/space-station/` (ripiego `~/.local/share/space-station/`):
 una riga malformata si ignora, un file assente vale "nessun dato". I
@@ -59,9 +61,11 @@ il percorso di `assets/` è risolto a runtime.
 | click destro | rimuove il modulo sulla cella |
 | `R` | ripara il modulo in avaria sotto il cursore |
 | `Spazio` | avvia/ferma la simulazione (da fermo si costruisce senza conseguenze, l'HUD mostra l'anteprima del bilancio) |
-| `Esc` | apre il menu di pausa e **congela il tick** (è un'altra cosa rispetto a `Spazio`) |
-| `M` | apre il mercato interno (facilities una tantum pagate coi punti partita) |
-| frecce + `Invio` | navigano i menu (nella griglia livelli: su/giù riga, sinistra/destra cella) |
+| `V` | velocità di gioco ×1/×2/×4 (stesse regole, tick più rapidi) |
+| `Esc` | apre il menu di pausa (con i volumi) e **congela il tick** (è un'altra cosa rispetto a `Spazio`) |
+| `M` | apre le scorte comprate nel Marketplace coi crediti delle medaglie |
+| `F12` | salva uno screenshot nella cartella corrente |
+| frecce + `Invio` | navigano i menu (nella griglia livelli: su/giù riga, sinistra/destra cella; `Invio` avanza anche il prologo) |
 
 Un modulo fermo dice sempre *perché*: velo scuro con fulmine giallo = la sua
 rete non ha energia a sufficienza, fulmine grigio = scollegato (la sua rete
@@ -111,9 +115,18 @@ e in `src/ui.rs` — e va tenuta allineata a `SPEC.md` §2.2.
 
 | File | Ruolo |
 |---|---|
-| `src/sim.rs` | tick di bilancio, reti elettriche per adiacenza, cascata di guasti, punteggio e fine partita. **È il cuore validato: non si ridisegna.** |
-| `src/modules.rs` | la tabella dei moduli |
+| `src/sim.rs` | tick di bilancio, reti elettriche per adiacenza, batterie, cascata di guasti, velocità, punteggio e fine partita. **È il cuore validato: non si ridisegna.** |
+| `src/modules.rs` | la tabella degli 11 moduli (con soglie di sblocco) |
 | `src/livelli.rs` | modalità, i 6 livelli curati + i 44 generati (50 totali), obiettivi, classifiche e progressione persistenti |
-| `src/main.rs` | griglia, piazzamento, autotiling dei corridoi, scala responsive, stati dell'app |
-| `src/ui.rs` | HUD (risorse + obiettivo di livello + punteggio), palette laterale, pannello ispezione, log |
-| `src/menu.rs` | titolo, campagna (selezione livello, briefing, livello completato), classifica, "come si gioca", pausa, fine partita |
+| `src/generatore.rs` | il generatore parametrico dei livelli 7-50 e del livello casuale (seed deterministici, garanzia di risolvibilità) |
+| `src/progressi.rs` | medaglie per livello, crediti e scorte del Marketplace (persistenti) |
+| `src/mercato.rs` | catalogo facilities e overlay SCORTE in partita |
+| `src/personaggi.rs` | i cinque personaggi: battute dei briefing, intermezzi, annunci di sblocco, commenti in partita |
+| `src/prologo.rs` | il prologo a fumetto che apre ogni livello (solo alla prima visita) |
+| `src/commenti.rs` | i mini-fumetti dei personaggi sugli eventi di gioco |
+| `src/musica.rs` | colonna sonora: traccia per blocco narrativo, pescata a caso nelle sandbox |
+| `src/audio.rs` | effetti sonori e regole di riproduzione |
+| `src/impostazioni.rs` | volumi musica/effetti, persistiti |
+| `src/main.rs` | griglia, piazzamento, autotiling dei corridoi, scala responsive, cursore/mirino, screenshot (F12, DEMO_FOTO), stati dell'app |
+| `src/ui.rs` | HUD (risorse, timer, obiettivo, punteggio, scorte), palette laterale, pannello ispezione, log |
+| `src/menu.rs` | titolo, campagna (selezione, briefing, intermezzi, livello completato), Marketplace, classifica, "come si gioca", pausa, fine partita |

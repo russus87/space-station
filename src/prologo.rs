@@ -6,17 +6,22 @@
 //! l'obiettivo del livello con "Indietro" e "Gioca!". Il briefing testuale
 //! pre-partita resta dov'è: questo è il sipario, non il libretto.
 //!
-//! Lo accende `applica_reset` (`prologo.pagina = Some(0)`) solo per
-//! Campagna e Casuale; finché è acceso, `attivo` fa da run condition per
-//! bloccare gli input di costruzione in `main.rs`. Il menu di pausa (Esc)
-//! passa sopra: l'overlay si nasconde e ricompare alla chiusura.
+//! Lo accende `applica_reset` chiamando `Prologo::richiedi(chiave)`, solo
+//! per Campagna e Casuale e solo la PRIMA volta che quel livello si vede
+//! nella sessione: "Riprova il livello" non rilegge il sipario. Finché è
+//! acceso, `attivo` fa da run condition per bloccare gli input di
+//! costruzione in `main.rs`. Il menu di pausa (Esc) passa sopra: l'overlay
+//! si nasconde e ricompare alla chiusura. Si naviga a mouse o tastiera
+//! (Invio/Spazio avanti, Backspace/freccia sinistra indietro).
 
 use crate::Art;
 use crate::livelli::{LIVELLI, LivelloCasuale, LivelloDef, Modalita};
 use crate::menu::{AppState, Pausa};
 use crate::personaggi::{PERSONAGGI, battuta_briefing};
 use crate::ui::{BIANCO, CIANO, GIALLO, GRIGIO_MEDIO, GRIGIO_SCAFO, METALLO, NERO, VERDE};
+use bevy::platform::collections::HashSet;
 use bevy::prelude::*;
+use std::hash::{DefaultHasher, Hash, Hasher};
 
 /// La battuta di servizio quando il livello non ne ha una propria (livello
 /// casuale; in campagna la copertura è totale). Parla Vera: è lei che apre
@@ -25,10 +30,37 @@ const FRASE_DI_SERVIZIO: (usize, &str) =
     (0, "Settore sconosciuto. Regole solite: aria, corrente, margine.");
 
 /// Pagina corrente del prologo: `None` = spento, `Some(0)` = personaggio,
-/// `Some(1)` = obiettivo. Attivato da `applica_reset`.
+/// `Some(1)` = obiettivo. Attivato da `applica_reset` via `richiedi`.
 #[derive(Resource, Default)]
 pub struct Prologo {
     pub pagina: Option<u8>,
+    /// Chiavi dei livelli già presentati in questa sessione: il sipario si
+    /// alza una volta sola per livello, i retry vanno dritti al cantiere.
+    visti: HashSet<u64>,
+}
+
+impl Prologo {
+    /// Apre il prologo solo se `chiave` non è mai stata vista; altrimenti
+    /// lo assicura chiuso (un reset non deve ereditare pagine sospese).
+    pub fn richiedi(&mut self, chiave: u64) {
+        self.pagina = if self.visti.insert(chiave) {
+            Some(0)
+        } else {
+            None
+        };
+    }
+}
+
+/// Chiave per un livello casuale: i livelli generati non hanno un indice,
+/// ma nome + budget + detriti li identificano quanto basta ("Riprova"
+/// rigioca lo stesso seed → stessa chiave → niente sipario doppio). Il bit
+/// alto tiene le chiavi lontane dagli indici 0..49 della campagna.
+pub fn chiave_casuale(livello: &LivelloDef) -> u64 {
+    let mut h = DefaultHasher::new();
+    livello.nome.hash(&mut h);
+    livello.max_moduli.hash(&mut h);
+    livello.ostacoli.hash(&mut h);
+    h.finish() | 0x8000_0000_0000_0000
 }
 
 /// Run condition: finché il prologo è a schermo, niente input di gioco.
@@ -267,10 +299,16 @@ fn pagina_obiettivo(r: &mut ChildSpawnerCommands, livello: &LivelloDef, indice: 
     });
 }
 
-/// Click e hover dei tre pulsanti. Il suono del click lo dà già il sistema
-/// globale (`audio::suona_click` ascolta ogni `Button`).
+/// Click, hover e tastiera dei pulsanti. Invio/Spazio avanzano (e dalla
+/// pagina obiettivo giocano), Backspace/freccia sinistra tornano al
+/// personaggio; Esc non si gestisce qui (apre la pausa sopra, voluto).
+/// Il suono del click lo dà già il sistema globale (`audio::suona_click`);
+/// gli input di costruzione sono spenti finché il prologo è aperto, quindi
+/// lo Spazio non avvia anche la simulazione sotto.
 pub fn click(
     mut prologo: ResMut<Prologo>,
+    tasti: Res<ButtonInput<KeyCode>>,
+    pausa: Res<Pausa>,
     mut q: Query<(&Interaction, &BottonePrologo, &mut BorderColor), Changed<Interaction>>,
 ) {
     for (interazione, b, mut bordo) in &mut q {
@@ -285,5 +323,25 @@ pub fn click(
             Interaction::Hovered => *bordo = BorderColor::all(b.evidenzia),
             Interaction::None => *bordo = BorderColor::all(GRIGIO_SCAFO),
         }
+    }
+    if pausa.aperta {
+        return;
+    }
+    match prologo.pagina {
+        Some(0) => {
+            if tasti.just_pressed(KeyCode::Enter) || tasti.just_pressed(KeyCode::Space) {
+                prologo.pagina = Some(1);
+            }
+        }
+        Some(_) => {
+            if tasti.just_pressed(KeyCode::Enter) || tasti.just_pressed(KeyCode::Space) {
+                prologo.pagina = None;
+            } else if tasti.just_pressed(KeyCode::Backspace)
+                || tasti.just_pressed(KeyCode::ArrowLeft)
+            {
+                prologo.pagina = Some(0);
+            }
+        }
+        None => {}
     }
 }

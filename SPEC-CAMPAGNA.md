@@ -1,15 +1,18 @@
 # SPEC — Campagna lunga, generatore e sblocchi (iterazione 4)
 
-> **STATO: IN GRAN PARTE IMPLEMENTATA** (approvazione dell'utente arrivata a
-> pezzi durante il playtest). Fatto: generatore e campagna a 50 (§2, in
+> **STATO: QUASI TUTTA IMPLEMENTATA** (approvazioni dell'utente arrivate a
+> pezzi durante i playtest). Fatto: generatore e campagna a 50 (§2, in
 > SPEC.md §13.2), livello casuale (§2.4), i 5 moduli sbloccabili (§3), i
-> personaggi come voci narrative a fumetto nei briefing e negli annunci di
-> sblocco (parte di §4 — i **tratti passivi** no, restano proposta), più il
-> **mercato interno** (non in questo documento: catalogo e regole in
-> `MANUALE.md` e `src/mercato.rs` — si paga in punti partita, niente valuta
-> reale). Restano proposte: tratti dei personaggi (§4), intermezzi (§6),
-> livelli curati di fine blocco, e le estensioni §9 (eventi, riparazione
-> con costo, velocità, stelle, audio, sfida del giorno).
+> personaggi come voci narrative — briefing, intermezzi (§6 ✓), annunci di
+> sblocco, prologo a fumetto e commenti in partita; il mercato è diventato
+> il **Marketplace** a crediti-medaglia con scorte persistenti (regole in
+> `MANUALE.md` e `src/mercato.rs`, mai valuta reale). Dalla §9: **9.3
+> velocità di gioco ✓** (tasto V), **9.5 audio ✓** (effetti + colonna
+> sonora), e **9.4 stelle: superata** — le medaglie oro/argento/rame a
+> tempo ne hanno preso il posto con in più l'economia dei crediti.
+> **Restano proposte**: 9.1 eventi con scelta, 9.2 riparazione con costo,
+> 9.6 sfida del giorno, i tratti passivi dei personaggi (§4) e i livelli
+> curati di fine blocco.
 
 Obiettivo dell'iterazione, nelle parole del giocatore: campagna lunga
 (~50 livelli) percorsa in modo lineare, sblocchi che danno cose utili ogni

@@ -503,7 +503,7 @@ pub fn intermezzo_per(livello: usize) -> Option<&'static Intermezzo> {
 
 /// La chiusura della campagna, mostrata completando il livello 50:
 /// `(indice in PERSONAGGI, testo)`. Chiude tutti gli archi di `STORIA.md`.
-pub const FINALE: (usize, &'static str) = (
+pub const FINALE: (usize, &str) = (
     COMANDANTE,
     "Diario del comandante, ultimo settore. Fine.\n\
      Ce l'abbiamo fatta. Lo scrivo piano, che non si rompa.\n\
@@ -516,6 +516,137 @@ pub const FINALE: (usize, &'static str) = (
      La stazione è tua, progettista. Io resto lo stesso.\n\
      Qualcuno dovrà pur spegnere l'ultima luce. Non oggi.",
 );
+
+// ---------------- commenti in partita ----------------
+
+/// Gli eventi di gioco che i personaggi chiosano dal vivo (mini-fumetto
+/// temporaneo, vedi `commenti.rs`). "Primo/Prima" = una volta per partita.
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub enum EventoCommento {
+    PrimoBlackout,
+    PrimaAvaria,
+    PrimoArrivo,
+    OssigenoCritico,
+    OroPreso,
+    /// Un detrito è stato rimosso (gru o sonda: le battute non nominano
+    /// l'attrezzo apposta).
+    DetritoRimosso,
+    /// Timer sotto il quarto finale.
+    TettoVicino,
+}
+
+/// Le chiose: 2-3 varianti per evento, voci diverse, in carattere con la
+/// bibbia — ironia sul presente, dramma sul passato, mai numeri. Corte:
+/// il balloon in partita è piccolo e il giocatore ha altro da guardare.
+const COMMENTI: &[(EventoCommento, usize, &str)] = &[
+    (
+        EventoCommento::PrimoBlackout,
+        INGEGNERA,
+        "Buio. Il buio è solo corrente che manca, e la corrente \
+         è un problema mio. Dammi un secondo.",
+    ),
+    (
+        EventoCommento::PrimoBlackout,
+        COMANDANTE,
+        "Blackout. Niente panico: il panico consuma ossigeno.",
+    ),
+    (
+        EventoCommento::PrimoBlackout,
+        CAPOSQUADRA,
+        "Chi ha spento? Nessuno. È peggio: non basta la corrente.",
+    ),
+    (
+        EventoCommento::PrimaAvaria,
+        INGEGNERA,
+        "Prima avaria. Non è un tradimento: è una macchina stanca. \
+         Riparala, e chiedile scusa da parte mia.",
+    ),
+    (
+        EventoCommento::PrimaAvaria,
+        MEDICO,
+        "Un guasto. Meglio le macchine della gente: \
+         si riparano col cacciavite.",
+    ),
+    (
+        EventoCommento::PrimoArrivo,
+        CAPOSQUADRA,
+        "Primo arrivo. Uno di noi, adesso. Trovagli un letto vero.",
+    ),
+    (
+        EventoCommento::PrimoArrivo,
+        MEDICO,
+        "Benvenuto a bordo. Respiri piano: qui l'aria si conta.",
+    ),
+    (
+        EventoCommento::PrimoArrivo,
+        COMANDANTE,
+        "Gente nuova. La stazione comincia adesso.",
+    ),
+    (
+        EventoCommento::OssigenoCritico,
+        MEDICO,
+        "Aria al limite. È il momento in cui non si corre: \
+         si respira piano e si costruisce giusto.",
+    ),
+    (
+        EventoCommento::OssigenoCritico,
+        SCIENZIATA,
+        "La riserva scende. I numeri non mentono mai: ascoltali.",
+    ),
+    (
+        EventoCommento::OroPreso,
+        COMANDANTE,
+        "Oro. Sulla Vecchia l'avrebbero incorniciato. \
+         Qui lo useremo.",
+    ),
+    (
+        EventoCommento::OroPreso,
+        SCIENZIATA,
+        "Tempo perfetto. Lo metto agli atti: \
+         margine, eleganza, margine.",
+    ),
+    (
+        EventoCommento::OroPreso,
+        CAPOSQUADRA,
+        "Oro! La squadra offre il caffè. \
+         Il caffè è finto, il rispetto no.",
+    ),
+    (
+        EventoCommento::DetritoRimosso,
+        CAPOSQUADRA,
+        "Un pezzo della Vecchia in meno. Riposa, ferro: \
+         la cella è nostra.",
+    ),
+    (
+        EventoCommento::DetritoRimosso,
+        INGEGNERA,
+        "Detrito rimosso. Lo spazio non si crea: si conquista.",
+    ),
+    (
+        EventoCommento::TettoVicino,
+        COMANDANTE,
+        "Il tempo stringe. Decidere in fretta non è correre: \
+         è comandare.",
+    ),
+    (
+        EventoCommento::TettoVicino,
+        SCIENZIATA,
+        "Quarto finale. Gli ultimi minuti pesano il doppio: \
+         spendili bene.",
+    ),
+];
+
+/// La chiosa per un evento: `(indice in PERSONAGGI, testo)`. `variante`
+/// ruota tra le alternative (modulo), così le partite non ripetono sempre
+/// la stessa voce.
+pub fn commento(evento: EventoCommento, variante: usize) -> (usize, &'static str) {
+    let alternative: Vec<(usize, &'static str)> = COMMENTI
+        .iter()
+        .filter(|(e, _, _)| *e == evento)
+        .map(|&(_, p, t)| (p, t))
+        .collect();
+    alternative[variante % alternative.len()]
+}
 
 // ---------------- test ----------------
 
@@ -591,6 +722,31 @@ mod test {
         }
         for livello in [2, 5, 10, 20, 30, 40, 50] {
             assert!(intermezzo_per(livello).is_none());
+        }
+    }
+
+    #[test]
+    fn ogni_evento_ha_almeno_due_voci_e_indici_validi() {
+        use EventoCommento::*;
+        let eventi = [
+            PrimoBlackout,
+            PrimaAvaria,
+            PrimoArrivo,
+            OssigenoCritico,
+            OroPreso,
+            DetritoRimosso,
+            TettoVicino,
+        ];
+        for evento in eventi {
+            let varianti = COMMENTI.iter().filter(|(e, _, _)| *e == evento).count();
+            assert!(varianti >= 2, "{evento:?}: solo {varianti} varianti");
+            // la rotazione non esce mai dall'elenco e cicla
+            for variante in 0..varianti * 2 {
+                let (p, testo) = commento(evento, variante);
+                assert!(p < PERSONAGGI.len());
+                assert!(!testo.is_empty());
+            }
+            assert_eq!(commento(evento, 0), commento(evento, varianti));
         }
     }
 

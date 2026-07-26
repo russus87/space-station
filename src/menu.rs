@@ -3,6 +3,7 @@
 //! lascia costruire (l'HUD mostra l'anteprima del bilancio), `Esc` apre questo
 //! menu e congela tutto, timer del tick compreso.
 
+use crate::audio::BottoneMuto;
 use crate::generatore;
 use crate::impostazioni::{Impostazioni, ciclo};
 use crate::livelli::{
@@ -14,7 +15,7 @@ use crate::progressi::Portafoglio;
 use rand::RngExt;
 use crate::modules::{KINDS, TABELLA};
 use crate::personaggi::{PERSONAGGI, annuncio_sblocco, battuta_briefing};
-use crate::sim::{MotivoFine, OSSIGENO_PER_CREW, Sim, TICK_SURRISCALDAMENTO, TICK_SECS};
+use crate::sim::{MotivoFine, OSSIGENO_PER_CREW, Sim, TICK_MASSIMO, TICK_SURRISCALDAMENTO, TICK_SECS};
 use crate::ui::{
     BIANCO, CIANO, GIALLO, GRIGIO_MEDIO, GRIGIO_SCAFO, METALLO, NERO, ROSSO, SCAFO_SCURO, VERDE,
 };
@@ -328,7 +329,12 @@ pub fn esci_titolo(mut commands: Commands, q: Query<Entity, With<SchermataTitolo
 
 // ---------------- Come si gioca ----------------
 
-pub fn entra_guida(mut commands: Commands, art: Res<Art>, mut sel: ResMut<Selezione>) {
+pub fn entra_guida(
+    mut commands: Commands,
+    art: Res<Art>,
+    progressione: Res<Progressione>,
+    mut sel: ResMut<Selezione>,
+) {
     *sel = Selezione {
         idx: 0,
         n: 1,
@@ -407,51 +413,73 @@ pub fn entra_guida(mut commands: Commands, art: Res<Art>, mut sel: ResMut<Selezi
                 }
             });
 
-            // i sei moduli
+            // gli 11 moduli, a griglia (6+5): gli sbloccabili non ancora
+            // conquistati mostrano la soglia invece dei costi
             r.spawn((
                 Node {
                     flex_direction: FlexDirection::Row,
-                    column_gap: Val::Px(14.0),
+                    flex_wrap: FlexWrap::Wrap,
+                    justify_content: JustifyContent::Center,
+                    max_width: Val::Px(640.0),
+                    column_gap: Val::Px(8.0),
+                    row_gap: Val::Px(6.0),
                     margin: UiRect::bottom(Val::Px(10.0)),
                     ..default()
                 },
             ))
-            .with_children(|riga| {
+            .with_children(|griglia| {
                 for (i, kind) in KINDS.iter().enumerate() {
                     let def = &TABELLA[kind.index()];
-                    riga.spawn((
-                        Node {
-                            flex_direction: FlexDirection::Column,
-                            align_items: AlignItems::Center,
-                            row_gap: Val::Px(3.0),
-                            width: Val::Px(120.0),
-                            ..default()
-                        },
-                    ))
-                    .with_children(|c| {
-                        c.spawn((
-                            ImageNode::new(art.moduli[i].clone()),
+                    let bloccato = progressione.completati < def.sblocco;
+                    griglia
+                        .spawn((
                             Node {
-                                width: Val::Px(48.0),
-                                height: Val::Px(48.0),
+                                flex_direction: FlexDirection::Column,
+                                align_items: AlignItems::Center,
+                                row_gap: Val::Px(2.0),
+                                width: Val::Px(96.0),
                                 ..default()
                             },
-                        ));
-                        c.spawn(testo(def.nome, 12.0, BIANCO));
-                        c.spawn(testo(
-                            format!("En {:+.0} · Cal {:+.0}", def.energia, def.calore),
-                            11.0,
-                            GRIGIO_MEDIO,
-                        ));
-                    });
+                        ))
+                        .with_children(|c| {
+                            c.spawn((
+                                ImageNode {
+                                    image: art.moduli[i].clone(),
+                                    color: if bloccato { GRIGIO_MEDIO } else { Color::WHITE },
+                                    ..default()
+                                },
+                                Node {
+                                    width: Val::Px(32.0),
+                                    height: Val::Px(32.0),
+                                    ..default()
+                                },
+                            ));
+                            const TASTI_GUIDA: [&str; 11] =
+                                ["1", "2", "3", "4", "5", "6", "7", "8", "9", "0", "C"];
+                            c.spawn(testo(
+                                format!("{}  {}", TASTI_GUIDA[i], def.nome),
+                                11.0,
+                                if bloccato { GRIGIO_MEDIO } else { BIANCO },
+                            ));
+                            c.spawn(testo(
+                                if bloccato {
+                                    format!("liv. {}", def.sblocco)
+                                } else {
+                                    format!("En {:+.0} · Cal {:+.0}", def.energia, def.calore)
+                                },
+                                10.0,
+                                GRIGIO_SCAFO,
+                            ));
+                        });
                 }
             });
 
             for riga in [
-                "1-6  scegli il modulo          click sinistro  piazza",
+                "1-6 e 7 8 9 0 C  scegli il modulo          click sinistro  piazza",
                 "click destro  rimuove          R  ripara un modulo in avaria",
-                "Spazio  avvia/ferma la simulazione (da fermo costruisci senza conseguenze)",
-                "Esc  apre il menu e congela tutto",
+                "Spazio  avvia/ferma          M  scorte          F12  screenshot",
+                "Esc  apre il menu (volumi compresi) e congela tutto",
+                "Finisci i livelli in fretta: le medaglie fruttano crediti per il Marketplace",
             ] {
                 r.spawn(testo(riga, 13.0, CIANO));
             }
@@ -515,8 +543,8 @@ pub fn entra_selezione(
             .with_children(|c| {
                 c.spawn(testo(
                     format!(
-                        "50 livelli in ordine — completati {} · il colore è la medaglia (oro, argento, rame) · frecce e Invio",
-                        progressione.completati
+                        "50 livelli — completati {} · il colore è la medaglia (oro, argento, rame) · hai {} crediti · frecce e Invio",
+                        progressione.completati, portafoglio.crediti
                     ),
                     13.0,
                     GRIGIO_MEDIO,
@@ -583,10 +611,17 @@ pub struct SchermataBriefing;
 
 /// Nome, briefing e obiettivo per esteso, prima di cominciare il livello.
 /// Nei livelli chiave un personaggio commenta il briefing a fumetto.
+/// Minuti:secondi per un numero di tick, per parlare la lingua del timer.
+fn tick_in_tempo(tick: u64) -> String {
+    let secondi = (tick as f32 * TICK_SECS) as u64;
+    format!("{}:{:02}", secondi / 60, secondi % 60)
+}
+
 pub fn entra_briefing(
     mut commands: Commands,
     scelto: Res<LivelloScelto>,
     art: Res<Art>,
+    portafoglio: Res<Portafoglio>,
     mut sel: ResMut<Selezione>,
 ) {
     let l = &LIVELLI[scelto.0];
@@ -628,6 +663,36 @@ pub fn entra_briefing(
                     CIANO,
                 ));
             });
+            // la medaglia già in bacheca e cosa serve per migliorarla: è
+            // l'informazione di chi sta decidendo se rigiocare
+            let medaglia = portafoglio.medaglia(scelto.0);
+            if medaglia > 0 {
+                let (nome, colore) = match medaglia {
+                    crate::progressi::ORO => ("ORO", GIALLO),
+                    crate::progressi::ARGENTO => ("ARGENTO", BIANCO),
+                    _ => ("RAME", crate::ui::RUGGINE),
+                };
+                let mut riga = format!("Medaglia attuale: {nome}");
+                if medaglia < crate::progressi::ORO {
+                    riga.push_str(&format!(
+                        "  ·  oro entro {}",
+                        tick_in_tempo(TICK_MASSIMO * 4 / 10)
+                    ));
+                    if medaglia < crate::progressi::ARGENTO {
+                        riga.push_str(&format!(
+                            ", argento entro {}",
+                            tick_in_tempo(TICK_MASSIMO * 7 / 10)
+                        ));
+                    }
+                }
+                r.spawn((Node {
+                    margin: UiRect::bottom(Val::Px(10.0)),
+                    ..default()
+                },))
+                .with_children(|c| {
+                    c.spawn(testo(riga, 13.0, colore));
+                });
+            }
             if let Some((personaggio, battuta)) = battuta_briefing(scelto.0 + 1) {
                 fumetto(r, &art, personaggio, battuta);
             }
@@ -840,7 +905,7 @@ fn card_facility(
     possedute: usize,
 ) {
     let f = &FACILITIES[i];
-    p.spawn((
+    let mut card = p.spawn((
         Node {
             width: Val::Px(140.0),
             height: Val::Px(150.0),
@@ -861,8 +926,12 @@ fn card_facility(
             etichetta: f.nome.into(),
         },
         StileCard { dorata },
-    ))
-    .with_children(|c| {
+    ));
+    // una card che non puoi permetterti non deve nemmeno suonare al click
+    if !dorata {
+        card.insert(BottoneMuto);
+    }
+    card.with_children(|c| {
         c.spawn((
             ImageNode {
                 image: art.facilities[i].clone(),
@@ -967,8 +1036,8 @@ pub fn entra_marketplace(
                 ..default()
             })
             .with_children(|griglia| {
-                for i in 0..FACILITIES.len() {
-                    let dorata = portafoglio.crediti >= FACILITIES[i].costo_crediti;
+                for (i, f) in FACILITIES.iter().enumerate() {
+                    let dorata = portafoglio.crediti >= f.costo_crediti;
                     let possedute =
                         portafoglio.scorte.iter().filter(|&&s| s == i).count();
                     card_facility(griglia, i, i, &art, dorata, possedute);
@@ -1227,14 +1296,16 @@ pub fn entra_fine(
     piazzamento: Res<UltimoPiazzamento>,
     mut sel: ResMut<Selezione>,
 ) {
+    // "Riprova il livello" vale anche per il casuale: il livello resta in
+    // `LivelloCasuale`, quindi il reset lo rigioca identico. Nel casuale
+    // c'è anche la terza via: un livello nuovo di zecca.
+    let con_livello = matches!(*modalita, Modalita::Campagna(_) | Modalita::Casuale);
+    let in_casuale = matches!(*modalita, Modalita::Casuale);
     *sel = Selezione {
         idx: 0,
-        n: 2,
+        n: if in_casuale { 3 } else { 2 },
         conferma: None,
     };
-    // "Riprova il livello" vale anche per il casuale: il livello resta in
-    // `LivelloCasuale`, quindi il reset lo rigioca identico
-    let con_livello = matches!(*modalita, Modalita::Campagna(_) | Modalita::Casuale);
     commands
         .spawn((
             radice_centrata(),
@@ -1312,7 +1383,12 @@ pub fn entra_fine(
             } else {
                 voce(r, 0, Azione::Ricomincia, "Ricomincia");
             }
-            voce(r, 1, Azione::TornaAlTitolo, "Torna al titolo");
+            if in_casuale {
+                voce(r, 1, Azione::GiocaCasuale, "Nuovo livello casuale");
+                voce(r, 2, Azione::TornaAlTitolo, "Torna al titolo");
+            } else {
+                voce(r, 1, Azione::TornaAlTitolo, "Torna al titolo");
+            }
         });
 }
 
@@ -1641,8 +1717,9 @@ pub fn aggiorna_voci_volume(imp: Res<Impostazioni>, mut voci: Query<&mut Voce>) 
 /// `Voce.etichetta`, che `evidenzia_voci` ricopia sul testo a ogni frame);
 /// il saldo non è una voce e si scrive direttamente.
 pub fn aggiorna_voci_marketplace(
+    mut commands: Commands,
     portafoglio: Res<Portafoglio>,
-    mut card: Query<(&Voce, &mut StileCard, &mut BorderColor)>,
+    mut card: Query<(Entity, &Voce, &mut StileCard, &mut BorderColor)>,
     mut icone: Query<(&IconaCard, &mut ImageNode)>,
     mut possedute: Query<(&PossedutePer, &mut Text), Without<SaldoCrediti>>,
     mut saldi: Query<&mut Text, With<SaldoCrediti>>,
@@ -1650,10 +1727,15 @@ pub fn aggiorna_voci_marketplace(
     if !portafoglio.is_changed() {
         return;
     }
-    for (v, mut stile, mut bordo) in &mut card {
+    for (e, v, mut stile, mut bordo) in &mut card {
         if let Azione::CompraFacility(i) = v.azione {
             stile.dorata = portafoglio.crediti >= FACILITIES[i].costo_crediti;
             *bordo = BorderColor::all(if stile.dorata { GIALLO } else { GRIGIO_SCAFO });
+            if stile.dorata {
+                commands.entity(e).remove::<BottoneMuto>();
+            } else {
+                commands.entity(e).insert(BottoneMuto);
+            }
         }
     }
     for (icona, mut img) in &mut icone {

@@ -12,11 +12,22 @@ Ordine di priorità degli interventi:
 
 Il log eventi funziona e resta, concettualmente invariato.
 
-> **Iterazione 4**: campagna a 50 livelli col generatore (§13.2), moduli
-> sbloccabili, personaggi a fumetto e mercato interno sono **implementati**
-> (vedi `MANUALE.md` per il quadro giocatore e `SPEC-CAMPAGNA.md` per il
-> disegno originale e ciò che resta da fare: tratti passivi dei personaggi,
-> intermezzi, velocità di gioco, stelle, eventi con scelta).
+> **Iterazione 4 (implementata)**: campagna a 50 livelli col generatore
+> (§13.2), moduli sbloccabili, personaggi a fumetto con storia completa
+> (intermezzi inclusi) e colonna sonora.
+>
+> **Iterazione 5 (implementata)**: il tetto tick è un **timer** nell'HUD
+> (`TEMPO m:ss`, giallo/rosso; velocità di gioco ×1/×2/×4 col tasto `V`,
+> `sim.rs`); completare un livello vale una **medaglia** (oro ≤40% del
+> tetto, argento ≤70%, rame entro il limite — `progressi.rs`) che colora
+> la griglia di selezione e frutta crediti una tantum (1/2/3); col saldo
+> si compra nel **Marketplace** del titolo (card a icone, `menu.rs`) e le
+> scorte si usano in partita col tasto `M` (`mercato.rs`, mai a vuoto);
+> ogni livello apre con un **prologo a fumetto** (solo alla prima visita,
+> `prologo.rs`); i personaggi **commentano gli eventi** in partita
+> (`commenti.rs`); cursore pixel-art con mirino in griglia. Il quadro
+> giocatore completo è in `MANUALE.md`; ciò che resta proposto è
+> nell'header di `SPEC-CAMPAGNA.md`.
 
 ---
 
@@ -500,9 +511,11 @@ sez. 10 — **cambiano la simulazione**, e sono lo stato implementato in
   "Colonia"), quindi non stringe le partite già vincibili. Impostato da
   `applica_reset` in `main.rs` secondo `Modalita`, non dentro `sim.rs`: la
   simulazione non sa cos'è una modalità, riceve solo il numero (o niente).
-- L'HUD mostra `TICK n/tetto` quando c'è un tetto, altrimenti `TICK n`; e
-  `PUNTI n` in fondo alla barra superiore, discreto: è un numero che si
-  guarda a fine partita, non il protagonista dello schermo.
+- L'HUD mostra il tetto come **timer** `TEMPO m:ss` (countdown in tempo
+  reale: bianco, giallo sotto il 25% residuo, rosso sotto il 10%; col
+  suffisso ` ×2`/` ×4` quando la velocità di gioco non è ×1), altrimenti
+  `TICK n`; e `PUNTI n` in fondo alla barra superiore, discreto: è un
+  numero che si guarda a fine partita, non il protagonista dello schermo.
 - La schermata di fine partita è descritta nella sez. 8.5; il titolo e il
   sottotitolo cambiano secondo `motivo_fine` (vedi `menu::entra_fine`).
 

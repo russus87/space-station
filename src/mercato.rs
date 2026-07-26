@@ -5,9 +5,11 @@
 //! sudati, mai valuta reale. Quelle comprate diventano scorte persistenti
 //! (`Portafoglio::scorte`); in partita il tasto `M` (o il bottone
 //! nell'HUD) apre questo overlay, che le elenca: click su una scorta = la
-//! si consuma e l'effetto si applica subito. Una scorta che qui non
-//! avrebbe effetto (ampliamento senza budget moduli, sonda senza detriti)
-//! si mostra spenta col motivo e non si può sprecare.
+//! si consuma e l'effetto si applica subito. Una scorta che ADESSO non
+//! avrebbe effetto — ampliamento senza budget, sonda senza detriti, coloni
+//! senza posti liberi, ossigeno a riserva piena, spurgo a stazione fredda,
+//! riparazione senza avarie — si mostra spenta col motivo e non si può
+//! sprecare (`non_applicabile`, ricontrollato anche al click).
 
 use crate::menu::{AppState, Pausa};
 use crate::progressi::Portafoglio;
@@ -100,13 +102,38 @@ pub fn conteggio_scorte(scorte: &[usize]) -> Vec<(usize, usize)> {
         .collect()
 }
 
-/// Perché una scorta NON è usabile in questa partita; `None` = usabile.
-fn non_applicabile(effetto: Effetto, station: &Station) -> Option<&'static str> {
+/// Perché una scorta NON è usabile ADESSO; `None` = usabile. Copre sia i
+/// vincoli di livello (budget, detriti) sia lo stato corrente della
+/// simulazione: una scorta non si spreca mai per un effetto nullo —
+/// niente coloni senza posti, niente ossigeno a riserva piena, niente
+/// riparazioni senza avarie, niente spurghi a stazione fredda.
+fn non_applicabile(
+    effetto: Effetto,
+    station: &Station,
+    sim: &Sim,
+    avarie: usize,
+) -> Option<&'static str> {
     match effetto {
         Effetto::Stiva if station.max_moduli.is_none() => Some("qui non c'è un budget moduli"),
         Effetto::Demolizione if station.ostacoli.is_empty() => Some("non ci sono detriti"),
+        Effetto::Coloni if sim.posti_letto <= sim.equipaggio => {
+            Some("non ci sono posti letto liberi")
+        }
+        Effetto::Ossigeno if sim.ossigeno >= O2_MAX => Some("riserva già al massimo"),
+        Effetto::Spurgo if sim.surriscaldamento == 0 => Some("nessun surriscaldamento"),
+        Effetto::Riparazione if avarie == 0 => Some("nessun modulo in avaria"),
         _ => None,
     }
+}
+
+/// L'applicabilità di tutto il catalogo, per accorgersi dei cambi mentre
+/// l'overlay è aperto (la sim continua a girare sotto): quando un vettore
+/// differisce dal precedente, l'overlay va ricostruito.
+fn applicabilita(station: &Station, sim: &Sim, avarie: usize) -> Vec<bool> {
+    FACILITIES
+        .iter()
+        .map(|f| non_applicabile(f.effetto, station, sim, avarie).is_none())
+        .collect()
 }
 
 // ---------------- input ----------------
@@ -159,7 +186,11 @@ fn testo(t: impl Into<String>, px: f32, colore: Color) -> impl Bundle {
 }
 
 /// L'overlay esiste solo quando le scorte sono aperte, in partita e senza
-/// il menu di pausa sopra; si ricostruisce quando l'inventario cambia.
+/// il menu di pausa sopra; si ricostruisce quando l'inventario cambia o
+/// quando cambia l'applicabilità di una scorta (la sim continua a girare
+/// sotto: una riparazione può diventare inutile — o utile — da un tick
+/// all'altro).
+#[allow(clippy::too_many_arguments)]
 pub fn sincronizza(
     mut commands: Commands,
     stato: Res<State<AppState>>,
@@ -167,12 +198,19 @@ pub fn sincronizza(
     mercato: Res<Mercato>,
     portafoglio: Res<Portafoglio>,
     station: Res<Station>,
+    sim: Res<Sim>,
+    moduli: Query<&Module>,
     art: Res<crate::Art>,
+    mut usabili_prima: Local<Vec<bool>>,
     q: Query<Entity, With<SchermataMercato>>,
 ) {
+    let avarie = moduli.iter().filter(|m| m.broken).count();
+    let usabili = applicabilita(&station, &sim, avarie);
     let deve_esserci = mercato.aperto && *stato.get() == AppState::InGioco && !pausa.aperta;
     let c_e = !q.is_empty();
-    if deve_esserci == c_e && !(deve_esserci && portafoglio.is_changed()) {
+    let cambiate = usabili != *usabili_prima;
+    *usabili_prima = usabili;
+    if deve_esserci == c_e && !(deve_esserci && (portafoglio.is_changed() || cambiate)) {
         return;
     }
     for e in &q {
@@ -234,7 +272,7 @@ pub fn sincronizza(
                     c.spawn((
                         ImageNode {
                             image: art.facilities[idx].clone(),
-                            color: if spenta { GRIGIO_MEDIO.into() } else { Color::WHITE },
+                            color: if spenta { GRIGIO_MEDIO } else { Color::WHITE },
                             ..default()
                         },
                         Node {
@@ -245,7 +283,7 @@ pub fn sincronizza(
                         },
                     ));
                 };
-                if let Some(motivo) = non_applicabile(f.effetto, &station) {
+                if let Some(motivo) = non_applicabile(f.effetto, &station, &sim, avarie) {
                     r.spawn(Node {
                         flex_direction: FlexDirection::Row,
                         align_items: AlignItems::Center,
@@ -312,8 +350,10 @@ pub fn click_scorte(
             continue;
         };
         // doppio controllo: l'overlay non mostra bottoni per le scorte non
-        // applicabili, ma tra spawn e click la griglia può essere cambiata
-        if non_applicabile(f.effetto, &station).is_some() {
+        // applicabili, ma tra spawn e click lo stato può essere cambiato —
+        // e una scorta non si consuma MAI per un effetto nullo
+        let avarie = moduli.iter().filter(|m| m.broken).count();
+        if non_applicabile(f.effetto, &station, &sim, avarie).is_some() {
             continue;
         }
         if !portafoglio.usa(voce.0) {

@@ -5,6 +5,7 @@
 //! schermate di menu in `menu.rs`.
 
 mod audio;
+mod commenti;
 mod generatore;
 mod impostazioni;
 mod livelli;
@@ -296,10 +297,13 @@ fn main() {
             Update,
             (
                 cursore_sopra,
-                // col prologo aperto la stazione non si tocca: né tasti
-                // (Spazio compreso) né click di costruzione né mercato
-                input_tastiera.run_if(not(prologo::attivo)),
-                input_mouse.run_if(not(prologo::attivo)),
+                // con un overlay aperto (prologo o scorte) la stazione non
+                // si tocca: né tasti (Spazio compreso) né click di
+                // costruzione — un click su una scorta non deve piazzare
+                // anche un modulo sulla griglia dietro
+                input_tastiera.run_if(costruzione_permessa),
+                sim::tasto_velocita.run_if(costruzione_permessa),
+                input_mouse.run_if(costruzione_permessa),
                 prologo::click,
                 ui::click_palette,
                 ui::click_bottone_menu,
@@ -326,6 +330,8 @@ fn main() {
                     orienta_corridoi,
                     mercato::sincronizza,
                     prologo::sincronizza,
+                    commenti::rileva_eventi,
+                    commenti::scadenza,
                     visibilita_scena,
                 ),
                 // audio e musica
@@ -363,6 +369,15 @@ fn main() {
 /// tutto, timer del tick compreso.
 fn sim_attiva(pausa: Res<Pausa>) -> bool {
     !pausa.aperta
+}
+
+/// Run condition per gli input di costruzione: nessun overlay che copre la
+/// griglia (prologo o inventario scorte) deve lasciar passare click e tasti.
+fn costruzione_permessa(
+    prologo_res: Res<prologo::Prologo>,
+    scorte: Res<mercato::Mercato>,
+) -> bool {
+    prologo_res.pagina.is_none() && !scorte.aperto
 }
 
 /// Il font di default di Bevy è un subset ASCII di Fira Mono: «·», «—»,
@@ -550,6 +565,7 @@ fn cursore_sopra(
         .and_then(|c| station.celle.get(&c).copied());
 }
 
+#[allow(clippy::too_many_arguments)]
 fn input_tastiera(
     tasti: Res<ButtonInput<KeyCode>>,
     pausa: Res<Pausa>,
@@ -677,6 +693,7 @@ fn costruisci_modulo(
     etichetta
 }
 
+#[allow(clippy::too_many_arguments)]
 fn input_mouse(
     mouse: Res<ButtonInput<MouseButton>>,
     finestre: Query<&Window, With<PrimaryWindow>>,
@@ -802,6 +819,7 @@ fn aggiorna_ghost(
 /// Badge e numero compensano la rotazione del genitore (i corridoi ruotano
 /// con l'autotiling): rotazione locale inversa e offset contro-ruotato, così
 /// simboli e cifre restano dritti e nell'angolo giusto dello schermo.
+#[allow(clippy::type_complexity)] // query disgiunte imposte dal borrow checker di Bevy
 fn aggiorna_visuali(
     tempo: Res<Time>,
     art: Res<Art>,
@@ -1253,8 +1271,14 @@ fn applica_reset(
         }
         log.info(0, format!("Moduli disponibili: {}", livello.max_moduli));
         log.info(0, "Costruisci e premi Spazio");
-        // il prologo a fumetto copre la griglia finché non si preme Gioca!
-        prologo_res.pagina = Some(0);
+        // il prologo a fumetto copre la griglia finché non si preme Gioca!,
+        // ma solo la prima volta che si incontra questo livello: al decimo
+        // "Riprova" il sipario non serve più
+        match *modalita {
+            Modalita::Campagna(i) => prologo_res.richiedi(i as u64),
+            Modalita::Casuale => prologo_res.richiedi(prologo::chiave_casuale(livello)),
+            _ => {}
+        }
     } else {
         match *modalita {
             Modalita::Sfida => log.info(

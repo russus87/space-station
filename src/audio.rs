@@ -25,6 +25,8 @@ pub struct Suoni {
     pub acquisto: Handle<AudioSource>,
     pub sblocco: Handle<AudioSource>,
     pub vittoria: Handle<AudioSource>,
+    /// Fanfara dedicata alla medaglia d'oro appena conquistata.
+    pub oro: Handle<AudioSource>,
     pub sconfitta: Handle<AudioSource>,
 }
 
@@ -39,6 +41,7 @@ pub fn carica_suoni(mut commands: Commands, assets: Res<AssetServer>) {
         acquisto: assets.load("audio/acquisto.wav"),
         sblocco: assets.load("audio/sblocco.wav"),
         vittoria: assets.load("audio/vittoria.wav"),
+        oro: assets.load("audio/oro.wav"),
         sconfitta: assets.load("audio/sconfitta.wav"),
     });
 }
@@ -105,32 +108,47 @@ pub fn suona_arrivi(
     *prima = sim.equipaggio;
 }
 
-/// Click su qualunque bottone della UI (voci di menu, palette, mercato).
+/// Marca un bottone che NON deve suonare al click: azioni negate (slot
+/// palette bloccati, card non acquistabili, scorte non usabili). Chi
+/// gestisce lo stato del bottone inserisce/rimuove questo componente.
+#[derive(Component)]
+pub struct BottoneMuto;
+
+/// Click su qualunque bottone della UI (voci di menu, palette, mercato),
+/// tranne i bottoni marcati muti: un'azione negata non dà feedback
+/// positivo.
+#[allow(clippy::type_complexity)] // filtro di query Bevy, non un tipo da nominare
 pub fn suona_click(
     mut commands: Commands,
     suoni: Res<Suoni>,
     imp: Res<Impostazioni>,
-    q: Query<&Interaction, (Changed<Interaction>, With<Button>)>,
+    q: Query<&Interaction, (Changed<Interaction>, With<Button>, Without<BottoneMuto>)>,
 ) {
     if q.iter().any(|i| *i == Interaction::Pressed) {
         suona(&mut commands, &suoni.click, imp.effetti_lineare());
     }
 }
 
-/// Livello completato: fanfara di sblocco se questo traguardo sblocca un
-/// modulo, fanfara normale altrimenti.
+/// Livello completato, in ordine di rarità dell'evento: la fanfara di
+/// sblocco se il traguardo consegna un modulo, quella dell'oro se la run
+/// ha preso la medaglia d'oro, la vittoria normale altrimenti.
 pub fn suona_completato(
     mut commands: Commands,
     suoni: Res<Suoni>,
     modalita: Res<Modalita>,
+    medaglia: Res<crate::livelli::UltimaMedaglia>,
     imp: Res<Impostazioni>,
 ) {
     let sblocco = matches!(*modalita, Modalita::Campagna(i) if annuncio_sblocco(i + 1).is_some());
-    if sblocco {
-        suona(&mut commands, &suoni.sblocco, imp.effetti_lineare());
+    let oro = matches!(medaglia.0, Some((presa, _)) if presa == crate::progressi::ORO);
+    let clip = if sblocco {
+        &suoni.sblocco
+    } else if oro {
+        &suoni.oro
     } else {
-        suona(&mut commands, &suoni.vittoria, imp.effetti_lineare());
-    }
+        &suoni.vittoria
+    };
+    suona(&mut commands, clip, imp.effetti_lineare());
 }
 
 pub fn suona_sconfitta(mut commands: Commands, suoni: Res<Suoni>, imp: Res<Impostazioni>) {

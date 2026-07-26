@@ -132,6 +132,24 @@ SUONI = {
         sil(0.015),
         seg(0.32, 784, forma="quadra"),
     ],
+    # medaglia d'oro: la fanfara di vittoria con l'ottava sopra e uno
+    # scintillio finale, ~1.2 s
+    "oro.wav": [
+        seg(0.11, 262, forma="quadra"),
+        sil(0.012),
+        seg(0.11, 392, forma="quadra"),
+        sil(0.012),
+        seg(0.11, 523, forma="quadra"),
+        sil(0.012),
+        seg(0.11, 659, forma="quadra"),
+        sil(0.012),
+        seg(0.20, 784, forma="quadra"),
+        sil(0.02),
+        seg(0.28, 1047, forma="quadra"),
+        seg(0.07, 1568, forma="triangolo"),
+        sil(0.02),
+        seg(0.11, 2093, forma="triangolo"),
+    ],
     # stazione persa: discesa cupa, ~1 s
     "sconfitta.wav": [
         seg(0.55, 220, 120, "quadra", rumore=0.15),
