@@ -102,8 +102,10 @@ pub enum Azione {
     IniziaLivello,
     /// Da "livello completato" al livello successivo, dritti in partita.
     LivelloSuccessivo,
-    /// Apre assets/manuale.pdf col visualizzatore di sistema.
+    /// Apre assets/manuale.html nel browser (la zine: la versione bella).
     ApriManuale,
+    /// Apre assets/manuale.pdf col visualizzatore (per chi stampa).
+    ApriManualePdf,
     ComeSiGioca,
     Riprendi,
     /// Passo successivo del volume musica (100→75→50→25→0→100).
@@ -332,17 +334,18 @@ pub fn esci_titolo(mut commands: Commands, q: Query<Entity, With<SchermataTitolo
 
 // ---------------- Come si gioca ----------------
 
-/// Apre `assets/manuale.pdf` col visualizzatore di sistema. Il percorso è
-/// risolto come `percorso_assets` in main.rs: accanto all'eseguibile
-/// (build distribuita), ripiego sulla radice del sorgente. Fallisce in
-/// silenzio: un PDF che non si apre non merita un allarme di stazione.
-fn apri_manuale() {
+/// Apre un file di `assets/` con l'applicazione di sistema (browser per
+/// l'HTML, visualizzatore per il PDF). Il percorso è risolto come
+/// `percorso_assets` in main.rs: accanto all'eseguibile (build
+/// distribuita), ripiego sulla radice del sorgente. Fallisce in silenzio:
+/// un manuale che non si apre non merita un allarme di stazione.
+fn apri_da_assets(nome: &str) {
     let percorso = std::env::current_exe()
         .ok()
-        .and_then(|exe| exe.parent().map(|d| d.join("assets/manuale.pdf")))
+        .and_then(|exe| exe.parent().map(|d| d.join("assets").join(nome)))
         .filter(|p| p.is_file())
         .unwrap_or_else(|| {
-            std::path::PathBuf::from(concat!(env!("CARGO_MANIFEST_DIR"), "/assets/manuale.pdf"))
+            std::path::PathBuf::from(concat!(env!("CARGO_MANIFEST_DIR"), "/assets")).join(nome)
         });
     if cfg!(target_os = "windows") {
         let _ = std::process::Command::new("cmd")
@@ -362,7 +365,7 @@ pub fn entra_guida(
 ) {
     *sel = Selezione {
         idx: 0,
-        n: 2,
+        n: 3,
         conferma: None,
     };
     commands
@@ -521,8 +524,9 @@ pub fn entra_guida(
                 height: Val::Px(16.0),
                 ..default()
             });
-            voce(r, 0, Azione::ApriManuale, "Manuale illustrato (PDF)");
-            voce(r, 1, Azione::Indietro, "Indietro");
+            voce(r, 0, Azione::ApriManuale, "Manuale illustrato");
+            voce(r, 1, Azione::ApriManualePdf, "Manuale in PDF (per la stampa)");
+            voce(r, 2, Azione::Indietro, "Indietro");
         });
 }
 
@@ -1572,7 +1576,8 @@ fn esegui(
                 prossimo.set(AppState::InGioco);
             }
         }
-        Azione::ApriManuale => apri_manuale(),
+        Azione::ApriManuale => apri_da_assets("manuale.html"),
+        Azione::ApriManualePdf => apri_da_assets("manuale.pdf"),
         Azione::ComeSiGioca => {
             origine.stato = if attuale == AppState::InGioco {
                 AppState::InGioco
