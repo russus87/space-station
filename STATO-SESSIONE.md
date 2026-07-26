@@ -1,100 +1,109 @@
-# Stato sessione — 26 luglio 2026, notte fonda
+# Stato sessione — 26 luglio 2026, notte
 
 ## Attività in corso
-Attesa esito CI del tag `v0.5.1` (run `30181078049`, ancora
-**in_progress** al momento di questo aggiornamento: job `arch`, `linux`,
-`windows` tutti avviati, nessuno step segnalato come fallito finora).
+Attesa esito CI del tag `v0.6.0` (run `30182346344`, **in_progress** al
+momento di questo aggiornamento: job `arch`, `linux`, `windows` avviati,
+nessuno step segnalato come fallito finora).
 
 ## Appena completato
-La v0.5.0 è COMPLETA in release (3 artefatti). Poi, con due fork Fable in
-sequenza (stessi file, quindi serializzati) su richieste dell'utente da
-playtest, commit `069b289`, tag `v0.5.1`:
+La v0.5.1 è COMPLETA (cursore ridisegnato: freccia canonica nei menu +
+mirino in griglia, sistema `cursore_pixel` a due stati). Poi, su richiesta
+utente "fai fare un giro a fable 5": doppia revisione con 2 fork
+read-only (tecnica + esperienza) → 13 punti prodotti. Su "fai tutto":
+wave di implementazione (4 fork paralleli con ownership rigida sui file
++ 1 fork docs + 1 Sonnet per la zine + main loop di coordinamento).
+Commit `30e5bc2`, tag `v0.6.0`.
 
-1. **Fix bug da screenshot utente**: il ghost di piazzamento (anteprima
-   modulo) seguiva il mouse anche sotto il prologo — ora `aggiorna_ghost`
-   lo nasconde con prologo aperto o overlay scorte aperto.
-2. **Cursore custom pixel-art 16×16** (`assets/sprites/cursore.png`,
-   hotspot in punta): `CursorIcon::Custom(CustomCursor::Image(...))`
-   sull'entità `PrimaryWindow`, sistema `cursore_pixel` in `main.rs`.
-3. **Schermata livello completato**: al posto del testo "MEDAGLIA D'ORO ·
-   +3 crediti", medaglia in pixel art 24×24 mostrata a 48px
-   (`assets/sprites/medaglie/{oro,argento,rame}.png`) e sotto 3 monete
-   16×16: accese 3/2/1 secondo la medaglia (le altre spente/grigie), le
-   accese ruotano con spin a 4 frame ~8fps
-   (`assets/sprites/monete/accesa_1..4` + `spenta`, sistema
-   `menu::anima_monete`). Nota tecnica: il gruppo visuali di
-   `add_systems` superava i 20 sistemi → riorganizzato in sotto-tuple
-   annidate.
-4. **Marketplace ridisegnato a CARD** (richiesta con screenshot): 6
-   icone facility 16×16 nuove
-   (`assets/sprites/facilities/{ossigeno,spurgo,riparazione,stiva,coloni,sonda}.png`),
-   griglia 3×2 di card 140×150 con icona 48px, nome, "ne hai N", prezzo
-   come fila di monete (una per credito, frame statico); cornice DORATA
-   (GIALLO 2px) se acquistabile, spenta (GRIGIO_SCAFO) se no; saldo con
-   icona moneta. Design: le card restano `Voce` ma con marker
-   `StileCard` — `evidenzia_voci` per le card tocca SOLO il bordo (non
-   riscrive più i testi figli, che avrebbe distrutto). Aggiornamento live
-   post-acquisto via `aggiorna_voci_marketplace` (marker `IconaCard`,
-   `PossedutePer`).
-5. **Icone scorte in partita**: fila `ScorteHud` nell'HUD accanto al
-   bottone "SCORTE m" (icone 20px per tipo, ×N per doppie, nascoste a
-   inventario vuoto, sistema `ui::update_scorte_hud`); icona 32px anche
-   nelle righe dell'overlay SCORTE.
-6. Sprite totali ora **44** (verificato: contati sul filesystem in
-   `assets/sprites/`). `HANDOFF.md` locale aggiornato.
-
-NON fatto (nota aperta): `MANUALE.md`/`GUIDA.md`/zine non mostrano ancora
-card, icone HUD, cursore e monete — da allineare a un prossimo giro docs.
+Contenuto v0.6.0:
+1. **Bug fix**: input di costruzione bloccati sotto l'overlay scorte
+   (run condition `costruzione_permessa` in `main.rs` — prima un click
+   su una scorta piazzava anche un modulo dietro); scorte MAI consumate
+   a vuoto (`non_applicabile` estesa in `mercato.rs` con 6 casi: coloni
+   senza posti, ossigeno pieno, spurgo a zero, riparazione senza avarie,
+   stiva senza budget, sonda senza detriti — overlay che si ricostruisce
+   quando l'applicabilità cambia); niente click sonoro sulle azioni
+   negate (`audio::BottoneMuto` su slot bloccati e card non acquistabili).
+2. **Test sul cuore**: regolamento batterie estratto in funzioni pure
+   (`bilancio_batterie_rete`, `regola_batteria` in `sim.rs`) + 6 test di
+   cui 3 su mini-World Bevy che esegue `sim_tick` vero (helper
+   `mondo_con`/`un_tick`; fix `Time::<()>::default()` per ambiguità).
+3. **Velocità ×1/×2/×4**: `Sim.velocita`, tasto V
+   (`sim::tasto_velocita`, registrato con
+   `run_if(costruzione_permessa)`), HUD mostra ×2/×4, `set_duration`
+   preserva l'elapsed, reset a 1 a ogni partita.
+4. **Commenti in partita** (nuovo `src/commenti.rs` + `personaggi.rs`
+   esteso): 17 battute su 7 eventi (PrimoBlackout, PrimaAvaria,
+   PrimoArrivo, OssigenoCritico, OroPreso, DetritoRimosso — scatta sia
+   per Gru che Sonda —, TettoVicino ≤25%), mini-fumetto 5s in basso a
+   destra (z=12), rilevamento via osservazione risorse con `Local`
+   (riarmo sul tick che torna indietro), rotazione varianti deterministica.
+5. **Prologo**: solo alla prima visita (`Prologo.visti` HashSet,
+   `richiedi(chiave)`, `chiave_casuale` per il casuale), tastiera
+   Invio/Spazio/Backspace/←.
+6. **Altro**: jingle oro (`assets/audio/oro.wav`, `suona_completato`:
+   sblocco > oro > vittoria); "Come si gioca" rifatta (griglia 11 moduli
+   con soglie, comandi completi); "Nuovo livello casuale" anche da
+   FinePartita; briefing con medaglia attuale + tempi da battere per
+   oro/argento; saldo crediti nel sottotitolo selezione; clippy pulito
+   (fix veri + `#[allow]` motivati).
+7. **Docs**: GUIDA/MANUALE/README/SPEC/SPEC-CAMPAGNA allineati (fork
+   docs: 11 moduli, V, F12 ovunque, tabella `src/` completa a 15 file,
+   SPEC nota "Iterazione 5 implementata", SPEC-CAMPAGNA: 9.3✓ 9.5✓ 9.4
+   superata dalle medaglie; restano 9.1 eventi, 9.2 riparazione con
+   costo, 9.6 sfida del giorno, tratti passivi, livelli curati fine
+   blocco); zine 24 pagine aggiornata (Sonnet) e ripubblicata, versione
+   uniformata a v0.6.
 
 ## Prossimo passo immediato
-Verificare l'esito della CI del tag `v0.5.1` (run `30181078049`,
-`gh run view 30181078049` o `gh run watch 30181078049`); se un job
-fallisce, sistemare e ritaggare. Se verde, comunicare che la release è
-pronta sui 3 artefatti.
+Verificare l'esito della CI del tag `v0.6.0` (`gh run view 30182346344`
+o `gh run watch 30182346344`); se un job fallisce, sistemare e ritaggare.
+Se verde, comunicare che la release è pronta.
 
 ## Passi successivi
-1. Esito CI v0.5.1 → se verde, release pronta.
-2. Playtest completo dell'utente del giro intero: medaglie → crediti →
-   card dorate → scorte in HUD (mai giocato da un umano end-to-end con
-   questa UI).
-3. Allineare docs (MANUALE/GUIDA/zine) alle novità grafiche v0.5.1
-   (card, icone HUD, cursore, monete) — rimandato a un giro dedicato.
+1. Esito CI v0.6.0 → se verde, release pronta.
+2. Playtest utente della wave: velocità (tasto V), commenti in partita,
+   prologo una-tantum, scorte mai vuote/bloccate — mai provato da un
+   umano end-to-end con queste novità.
+3. Da `SPEC-CAMPAGNA.md` §9 restano (non ancora approvate): eventi con
+   scelta (la più grossa), riparazione con costo, sfida del giorno,
+   tratti passivi dei personaggi, livelli curati di fine blocco.
 4. Bilanciamento generale mai playtestato: curva del generatore, costi
    di marketplace, soglie/crediti delle medaglie, numeri dei moduli.
-5. Da `SPEC-CAMPAGNA.md` §9 restano (non ancora approvate): eventi con
-   scelta, riparazione con costo, velocità 1×/2×/4×, sfida del giorno.
-6. Tratti passivi dei personaggi (proposta non implementata).
 
 ## Stato di verifica
 - Verificato io stesso, ora: `cargo build --quiet` compila **a 0
   warning** (nessuna riga in output).
-- Verificato io stesso, ora: `cargo test --quiet` — **31/31** test
-  passati.
-- Verificato io stesso, ora: `git log` mostra `069b289` in testa su
-  `main`; tag `v0.5.1` presente e puntato allo stesso commit; `Cargo.toml`
-  riporta `version = "0.5.1"`. `git status` pulito, nulla in sospeso.
-- Verificato io stesso, ora, sul filesystem: tutti i file citati esistono
-  — `assets/sprites/cursore.png`, `assets/sprites/medaglie/{oro,argento,rame}.png`,
-  `assets/sprites/monete/{accesa_1..4,spenta}.png`,
-  `assets/sprites/facilities/{ossigeno,spurgo,riparazione,stiva,coloni,sonda}.png`;
-  conteggio totale sprite in `assets/sprites/`: **44**, coerente col
-  riassunto ricevuto.
-- Verificato io stesso, ora, via `gh run view 30181078049`: run per il
-  tag `v0.5.1`, trigger push, **in_progress**, job
-  `arch`/`linux`/`windows` avviati, nessun fallimento segnalato. Coerente
-  col riassunto ricevuto ("CI in corso").
+- Verificato io stesso, ora: `cargo test --quiet` — **38/38** test
+  passati, coerente col riassunto ricevuto.
+- Verificato io stesso, ora: `cargo clippy --quiet` (default, senza
+  `--all-targets`) — **0 warning**, coerente col riassunto ("0 clippy").
+  Nota/discrepanza minore: `cargo clippy --quiet --all-targets` (che
+  include anche i target di test) segnala 2 warning
+  `field_reassign_with_default` di scarsa importanza, in
+  `src/livelli.rs:609` e `src/sim.rs:718` (assegnazioni di campo su
+  `Sim::default()` nei test) — non coperti dal comando di default né
+  dalla CI (che non invoca clippy in `.github/workflows/build.yml`).
+  Non bloccante, segnalato per completezza.
+- Verificato io stesso, ora: `git log` mostra `30e5bc2` in testa su
+  `main` (con `89e2ee1` e `069b289` sotto); tag `v0.6.0` presente e
+  puntato allo stesso commit; `Cargo.toml` riporta `version = "0.6.0"`.
+  `git status` pulito, nulla in sospeso.
+- Verificato io stesso, ora, via `gh run view 30182346344`: run per il
+  tag `v0.6.0`, trigger push, **in_progress**, job
+  `arch`/`linux`/`windows` avviati, nessun fallimento segnalato finora.
 - Riferito (non ri-eseguito da me in questa passata): smoke test del
-  gioco in esecuzione (ghost nascosto sotto prologo, cursore custom,
-  medaglie/monete animate, card marketplace, icone scorte HUD) —
-  verificato dalla sessione precedente ma non ripetuto qui; nessun
-  playtest umano completo finora.
+  gioco in esecuzione (bug fix scorte/costruzione, velocità V, commenti
+  in partita, prologo una-tantum) — verificato dalla sessione precedente
+  ma non ripetuto qui; nessun playtest umano completo finora.
 
 ## Decisioni prese in sessione
-- Marketplace a card: le card restano entità `Voce` (per riusare
-  navigazione/selezione esistente) ma con marker `StileCard` dedicato,
-  per evitare che l'evidenziazione standard riscriva/distrugga i testi
-  figli delle card — scelta tecnica per non duplicare la logica di
-  navigazione del menu.
-- Prezzo delle card mostrato come fila di monete statiche (una per
-  credito) invece che come numero, per coerenza visiva col nuovo sistema
-  di monete animate della schermata completato.
+- Wave di implementazione con 4 fork paralleli a ownership rigida sui
+  file (per evitare conflitti di merge tra fork che scrivono in
+  parallelo), più 1 fork dedicato solo ai docs e 1 sub-agent Sonnet
+  dedicato solo alla zine — separazione per tenere il lavoro grafico/
+  editoriale fuori dai fork che toccano codice.
+- Regolamento batterie estratto in funzioni pure separate da Bevy
+  (`bilancio_batterie_rete`, `regola_batteria`) per renderlo testabile
+  senza dover sempre passare da un `World` Bevy completo — pur
+  mantenendo comunque 3 test che esercitano `sim_tick` reale su un
+  mini-World, per coprire anche l'integrazione col sistema.
