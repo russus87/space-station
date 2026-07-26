@@ -972,22 +972,46 @@ FIAMMA = [
 # in main.rs deve combaciare.
 
 CURSORE = [
-    "K...............",
-    "KK..............",
-    "KwK.............",
-    "KwwK............",
-    "KwwwK...........",
-    "KwwwwK..........",
-    "KwwwwwK.........",
-    "KwwwwwwK........",
-    "KwwwwwwwK.......",
-    "KwwwwwKKKK......",
-    "KwwKwCK.........",
-    "KwK.KwCK........",
-    "KK...KwCK.......",
-    "K.....KwCK......",
+    ".K..............",
+    ".KK.............",
+    ".KwK............",
+    ".KwwK...........",
+    ".KwwwK..........",
+    ".KwwwwK.........",
+    ".KwwwwwK........",
+    ".KwwwwwwK.......",
+    ".KwwwwwwlK......",
+    ".KwwwwwwwlK.....",
+    ".KwwwwwKKKKK....",
+    ".KwwKwwlK.......",
+    ".KwK.KwwlK......",
+    ".KK...KwwlK.....",
+    ".K.....KwlK.....",
+    "........KK......",
+]
+
+# ========================== MIRINO 16x16 ==============================
+# Cursore di piazzamento in partita: croce sottile con centro libero,
+# bracci quasi-bianchi bordati di nero, punte esterne ciano. Hotspot al
+# centro (8,8).
+
+MIRINO = [
+    "................",
+    ".......KK.......",
     ".......KCK......",
-    "........K.......",
+    ".......KwK......",
+    ".......KwK......",
+    ".......KwK......",
+    "................",
+    ".KKKKKK...KKKKK.",
+    "KCwwwwK...KwwwCK",
+    ".KKKKKK...KKKKK.",
+    "................",
+    ".......KwK......",
+    ".......KwK......",
+    ".......KwK......",
+    ".......KCK......",
+    ".......KK.......",
 ]
 
 # ========================= MEDAGLIE 24x24 =============================
@@ -1224,6 +1248,7 @@ FAC_SONDA = [
 
 SPRITES = {
     "sprites/cursore.png": (CURSORE, 16, 16),
+    "sprites/mirino.png": (MIRINO, 16, 16),
     "sprites/facilities/ossigeno.png": (FAC_OSSIGENO, 16, 16),
     "sprites/facilities/spurgo.png": (FAC_SPURGO, 16, 16),
     "sprites/facilities/riparazione.png": (FAC_RIPARAZIONE, 16, 16),

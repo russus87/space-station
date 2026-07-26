@@ -54,6 +54,8 @@ pub struct Art {
     pub sfondo_stelle: Handle<Image>,
     /// Detrito che occupa una cella nei livelli della campagna.
     pub ostacolo: Handle<Image>,
+    /// Mirino di piazzamento: cursore alternativo mostrato in partita.
+    pub mirino: Handle<Image>,
     /// Icone delle sei facility del Marketplace, nell'ordine di
     /// `mercato::FACILITIES` (card, HUD scorte, overlay scorte).
     pub facilities: [Handle<Image>; 6],
@@ -415,6 +417,7 @@ fn carica_art(mut commands: Commands, assets: Res<AssetServer>) {
             assets.load("sprites/facilities/sonda.png"),
         ],
         cursore: assets.load("sprites/cursore.png"),
+        mirino: assets.load("sprites/mirino.png"),
         medaglie: [
             assets.load("sprites/medaglie/oro.png"),
             assets.load("sprites/medaglie/argento.png"),
@@ -985,28 +988,47 @@ fn visibilita_scena(
 /// Sostituisce il cursore di sistema con la freccia pixel-art appena
 /// l'immagine è caricata (una volta sola): l'hotspot (0,0) è la punta,
 /// come disegnata in `gen_sprites.py`.
+/// Cursore pixel-art a due stati: freccia nei menu e negli overlay, mirino
+/// (hotspot al centro) quando si sta davvero piazzando sulla griglia.
+#[allow(clippy::too_many_arguments)]
 fn cursore_pixel(
-    mut fatto: Local<bool>,
+    mut attuale: Local<Option<bool>>,
     immagini: Res<Assets<Image>>,
     art: Res<Art>,
+    stato: Res<State<AppState>>,
+    pausa: Res<Pausa>,
+    prologo_res: Res<prologo::Prologo>,
+    scorte: Res<mercato::Mercato>,
     finestre: Query<Entity, With<PrimaryWindow>>,
     mut commands: Commands,
 ) {
     use bevy::window::{CursorIcon, CustomCursor, CustomCursorImage};
-    if *fatto || immagini.get(&art.cursore).is_none() {
+    if immagini.get(&art.cursore).is_none() || immagini.get(&art.mirino).is_none() {
+        return;
+    }
+    let mirino = *stato.get() == AppState::InGioco
+        && !pausa.aperta
+        && prologo_res.pagina.is_none()
+        && !scorte.aperto;
+    if *attuale == Some(mirino) {
         return;
     }
     let Ok(finestra) = finestre.single() else {
         return;
     };
+    let (handle, hotspot) = if mirino {
+        (art.mirino.clone(), (8, 8))
+    } else {
+        (art.cursore.clone(), (1, 0))
+    };
     commands
         .entity(finestra)
         .insert(CursorIcon::Custom(CustomCursor::Image(CustomCursorImage {
-            handle: art.cursore.clone(),
-            hotspot: (0, 0),
+            handle,
+            hotspot,
             ..default()
         })));
-    *fatto = true;
+    *attuale = Some(mirino);
 }
 
 /// F12: screenshot della finestra nella cartella corrente, in ogni schermata.
