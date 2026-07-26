@@ -811,20 +811,99 @@ pub struct SchermataMarketplace;
 #[derive(Component)]
 pub struct SaldoCrediti;
 
-/// L'etichetta di catalogo della facility `i`: nome, effetto, costo,
-/// quante se ne possiedono e l'eventuale nota sui crediti che non bastano
-/// (le voci restano cliccabili ma `compra` rifiuta: niente sorprese).
-fn etichetta_facility(i: usize, portafoglio: &Portafoglio) -> String {
+/// Una voce-card del Marketplace: `evidenzia_voci` NON tocca né i testi né
+/// lo stile delle card (hanno figli propri: icona, monete); lo stato
+/// dorata/scura lo tiene aggiornato `aggiorna_voci_marketplace`.
+#[derive(Component)]
+pub struct StileCard {
+    pub dorata: bool,
+}
+
+/// L'icona della facility dentro una card: si smorza quando i crediti non
+/// bastano.
+#[derive(Component)]
+pub struct IconaCard(pub usize);
+
+/// Il contatore "ne hai N" dentro la card della facility `i`.
+#[derive(Component)]
+pub struct PossedutePer(pub usize);
+
+/// Una card del catalogo: quadrata, icona pixel-art, nome, possedute e
+/// prezzo in monete. Dorata quando i crediti bastano, scura quando no.
+/// Resta una `Voce` (navigazione con frecce e Invio, click, `esegui`).
+fn card_facility(
+    p: &mut ChildSpawnerCommands,
+    idx: usize,
+    i: usize,
+    art: &Art,
+    dorata: bool,
+    possedute: usize,
+) {
     let f = &FACILITIES[i];
-    let possedute = portafoglio.scorte.iter().filter(|&&s| s == i).count();
-    let mut riga = format!("{} — {} — {} crediti", f.nome, f.descrizione, f.costo_crediti);
-    if possedute > 0 {
-        riga.push_str(&format!("  · ne hai {possedute}"));
-    }
-    if portafoglio.crediti < f.costo_crediti {
-        riga.push_str("  · crediti insufficienti");
-    }
-    riga
+    p.spawn((
+        Node {
+            width: Val::Px(140.0),
+            height: Val::Px(150.0),
+            flex_direction: FlexDirection::Column,
+            align_items: AlignItems::Center,
+            justify_content: JustifyContent::Center,
+            row_gap: Val::Px(5.0),
+            padding: UiRect::all(Val::Px(8.0)),
+            border: UiRect::all(Val::Px(2.0)),
+            ..default()
+        },
+        BackgroundColor(SCAFO_SCURO),
+        BorderColor::all(if dorata { GIALLO } else { GRIGIO_SCAFO }),
+        Button,
+        Voce {
+            idx,
+            azione: Azione::CompraFacility(i),
+            etichetta: f.nome.into(),
+        },
+        StileCard { dorata },
+    ))
+    .with_children(|c| {
+        c.spawn((
+            ImageNode {
+                image: art.facilities[i].clone(),
+                color: if dorata { Color::WHITE } else { GRIGIO_MEDIO },
+                ..default()
+            },
+            Node {
+                width: Val::Px(48.0),
+                height: Val::Px(48.0),
+                ..default()
+            },
+            IconaCard(i),
+        ));
+        c.spawn(testo(f.nome, 12.0, BIANCO));
+        let iniziale = if possedute > 0 {
+            format!("ne hai {possedute}")
+        } else {
+            String::new()
+        };
+        c.spawn((testo(iniziale, 11.0, CIANO), PossedutePer(i)));
+        // il prezzo: una moneta per credito, ferma (l'animazione è un
+        // premio della schermata medaglia, qui è un cartellino)
+        c.spawn(Node {
+            flex_direction: FlexDirection::Row,
+            column_gap: Val::Px(3.0),
+            margin: UiRect::top(Val::Px(4.0)),
+            ..default()
+        })
+        .with_children(|monete| {
+            for _ in 0..f.costo_crediti {
+                monete.spawn((
+                    ImageNode::new(art.monete_accese[0].clone()),
+                    Node {
+                        width: Val::Px(14.0),
+                        height: Val::Px(14.0),
+                        ..default()
+                    },
+                ));
+            }
+        });
+    });
 }
 
 /// Catalogo delle facilities: si compra coi crediti delle medaglie
@@ -833,6 +912,7 @@ fn etichetta_facility(i: usize, portafoglio: &Portafoglio) -> String {
 pub fn entra_marketplace(
     mut commands: Commands,
     portafoglio: Res<Portafoglio>,
+    art: Res<Art>,
     mut sel: ResMut<Selezione>,
 ) {
     *sel = Selezione {
@@ -854,24 +934,46 @@ pub fn entra_marketplace(
                 13.0,
                 GRIGIO_MEDIO,
             ));
-            r.spawn((Node {
+            // saldo: moneta + numero, ben visibile
+            r.spawn(Node {
+                flex_direction: FlexDirection::Row,
+                align_items: AlignItems::Center,
+                column_gap: Val::Px(6.0),
                 margin: UiRect::bottom(Val::Px(14.0)),
                 ..default()
-            },))
+            })
             .with_children(|c| {
                 c.spawn((
-                    testo(format!("hai {} crediti", portafoglio.crediti), 15.0, GIALLO),
+                    ImageNode::new(art.monete_accese[0].clone()),
+                    Node {
+                        width: Val::Px(18.0),
+                        height: Val::Px(18.0),
+                        ..default()
+                    },
+                ));
+                c.spawn((
+                    testo(format!("hai {} crediti", portafoglio.crediti), 16.0, GIALLO),
                     SaldoCrediti,
                 ));
             });
-            for i in 0..FACILITIES.len() {
-                voce(
-                    r,
-                    i,
-                    Azione::CompraFacility(i),
-                    etichetta_facility(i, &portafoglio),
-                );
-            }
+            // il catalogo: 6 card in griglia, 3 per riga
+            r.spawn(Node {
+                flex_direction: FlexDirection::Row,
+                flex_wrap: FlexWrap::Wrap,
+                justify_content: JustifyContent::Center,
+                max_width: Val::Px(3.0 * 152.0),
+                column_gap: Val::Px(10.0),
+                row_gap: Val::Px(10.0),
+                ..default()
+            })
+            .with_children(|griglia| {
+                for i in 0..FACILITIES.len() {
+                    let dorata = portafoglio.crediti >= FACILITIES[i].costo_crediti;
+                    let possedute =
+                        portafoglio.scorte.iter().filter(|&&s| s == i).count();
+                    card_facility(griglia, i, i, &art, dorata, possedute);
+                }
+            });
             r.spawn(Node {
                 height: Val::Px(14.0),
                 ..default()
@@ -951,23 +1053,68 @@ pub fn entra_completato(
             .with_children(|c| {
                 c.spawn(testo(format!("Tick: {}", sim.tick), 14.0, METALLO));
             });
+            // la medaglia disegnata, e sotto le tre monete: accese quante ne
+            // vale la medaglia (oro 3, argento 2, rame 1), le altre spente.
+            // Le accese ruotano (anima_monete).
             r.spawn((Node {
                 margin: UiRect::bottom(Val::Px(18.0)),
+                flex_direction: FlexDirection::Column,
+                align_items: AlignItems::Center,
+                row_gap: Val::Px(6.0),
                 ..default()
             },))
             .with_children(|c| {
                 if let Some((presa, crediti)) = medaglia.0 {
-                    let (nome, colore) = match presa {
-                        crate::progressi::ORO => ("MEDAGLIA D'ORO", GIALLO),
-                        crate::progressi::ARGENTO => ("MEDAGLIA D'ARGENTO", BIANCO),
-                        _ => ("MEDAGLIA DI RAME", crate::ui::RUGGINE),
+                    let indice = match presa {
+                        crate::progressi::ORO => 0,
+                        crate::progressi::ARGENTO => 1,
+                        _ => 2,
                     };
-                    let riga = if crediti > 0 {
-                        format!("{nome}  ·  +{crediti} crediti per il Marketplace")
-                    } else {
-                        nome.to_string()
-                    };
-                    c.spawn(testo(riga, 16.0, colore));
+                    c.spawn((
+                        ImageNode::new(art.medaglie[indice].clone()),
+                        Node {
+                            width: Val::Px(48.0),
+                            height: Val::Px(48.0),
+                            ..default()
+                        },
+                    ));
+                    c.spawn(Node {
+                        flex_direction: FlexDirection::Row,
+                        column_gap: Val::Px(6.0),
+                        ..default()
+                    })
+                    .with_children(|monete| {
+                        let accese = presa as usize;
+                        for i in 0..3 {
+                            if i < accese {
+                                monete.spawn((
+                                    ImageNode::new(art.monete_accese[0].clone()),
+                                    Node {
+                                        width: Val::Px(24.0),
+                                        height: Val::Px(24.0),
+                                        ..default()
+                                    },
+                                    MonetaAnimata,
+                                ));
+                            } else {
+                                monete.spawn((
+                                    ImageNode::new(art.moneta_spenta.clone()),
+                                    Node {
+                                        width: Val::Px(24.0),
+                                        height: Val::Px(24.0),
+                                        ..default()
+                                    },
+                                ));
+                            }
+                        }
+                    });
+                    if crediti > 0 {
+                        c.spawn(testo(
+                            format!("+{crediti} crediti per il Marketplace"),
+                            13.0,
+                            GIALLO,
+                        ));
+                    }
                 }
             });
             // ai traguardi della campagna il personaggio di turno presenta
@@ -1454,6 +1601,25 @@ fn esegui(
 }
 
 /// Evidenzia la voce selezionata e mostra la richiesta di conferma.
+/// Moneta accesa nella schermata "livello completato": ruota ciclando i
+/// 4 frame dello spin, tutte in sincrono (~8 fps).
+#[derive(Component)]
+pub struct MonetaAnimata;
+
+pub fn anima_monete(
+    tempo: Res<Time>,
+    art: Res<Art>,
+    mut monete: Query<&mut ImageNode, With<MonetaAnimata>>,
+) {
+    let frame = (tempo.elapsed_secs() * 8.0) as usize % art.monete_accese.len();
+    for mut img in &mut monete {
+        let nuovo = &art.monete_accese[frame];
+        if img.image != *nuovo {
+            img.image = nuovo.clone();
+        }
+    }
+}
+
 /// Tiene aggiornate le etichette dei volumi nel menu di pausa: si scrive
 /// `Voce.etichetta` (non il testo) perché `evidenzia_voci` la ricopia a
 /// ogni frame.
@@ -1476,16 +1642,31 @@ pub fn aggiorna_voci_volume(imp: Res<Impostazioni>, mut voci: Query<&mut Voce>) 
 /// il saldo non è una voce e si scrive direttamente.
 pub fn aggiorna_voci_marketplace(
     portafoglio: Res<Portafoglio>,
-    mut voci: Query<&mut Voce>,
+    mut card: Query<(&Voce, &mut StileCard, &mut BorderColor)>,
+    mut icone: Query<(&IconaCard, &mut ImageNode)>,
+    mut possedute: Query<(&PossedutePer, &mut Text), Without<SaldoCrediti>>,
     mut saldi: Query<&mut Text, With<SaldoCrediti>>,
 ) {
     if !portafoglio.is_changed() {
         return;
     }
-    for mut v in &mut voci {
+    for (v, mut stile, mut bordo) in &mut card {
         if let Azione::CompraFacility(i) = v.azione {
-            v.etichetta = etichetta_facility(i, &portafoglio);
+            stile.dorata = portafoglio.crediti >= FACILITIES[i].costo_crediti;
+            *bordo = BorderColor::all(if stile.dorata { GIALLO } else { GRIGIO_SCAFO });
         }
+    }
+    for (icona, mut img) in &mut icone {
+        let dorata = portafoglio.crediti >= FACILITIES[icona.0].costo_crediti;
+        img.color = if dorata { Color::WHITE } else { GRIGIO_MEDIO };
+    }
+    for (per, mut t) in &mut possedute {
+        let n = portafoglio.scorte.iter().filter(|&&s| s == per.0).count();
+        t.0 = if n > 0 {
+            format!("ne hai {n}")
+        } else {
+            String::new()
+        };
     }
     for mut t in &mut saldi {
         t.0 = format!("hai {} crediti", portafoglio.crediti);
@@ -1494,12 +1675,30 @@ pub fn aggiorna_voci_marketplace(
 
 pub fn evidenzia_voci(
     sel: Res<Selezione>,
-    mut voci: Query<(&Voce, &Children, &mut BackgroundColor, &mut BorderColor)>,
+    mut voci: Query<(
+        &Voce,
+        &Children,
+        &mut BackgroundColor,
+        &mut BorderColor,
+        Option<&StileCard>,
+    )>,
     mut testi: Query<(&mut Text, &mut TextColor, Option<&ColoreFisso>)>,
 ) {
-    for (v, figli, mut bg, mut bordo) in &mut voci {
+    for (v, figli, mut bg, mut bordo, card) in &mut voci {
         let scelta = v.idx == sel.idx;
         let in_conferma = sel.conferma == Some(v.idx);
+        // le card del Marketplace hanno stile e figli propri (icona, monete):
+        // qui si segnala solo la selezione col bordo, il resto non si tocca
+        if let Some(card) = card {
+            *bordo = BorderColor::all(if scelta {
+                BIANCO
+            } else if card.dorata {
+                GIALLO
+            } else {
+                GRIGIO_SCAFO
+            });
+            continue;
+        }
         bg.0 = if scelta { GRIGIO_SCAFO } else { Color::NONE };
         *bordo = BorderColor::all(if in_conferma {
             ROSSO

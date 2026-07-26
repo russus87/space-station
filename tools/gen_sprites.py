@@ -966,7 +966,278 @@ FIAMMA = [
 
 # =========================== FILE DA GENERARE =========================
 
+# ========================== CURSORE 16x16 =============================
+# Freccia pixel-art per il cursore custom della finestra: corpo quasi
+# bianco, contorno nero, coda in ciano. La punta e' in (0,0): l'hotspot
+# in main.rs deve combaciare.
+
+CURSORE = [
+    "K...............",
+    "KK..............",
+    "KwK.............",
+    "KwwK............",
+    "KwwwK...........",
+    "KwwwwK..........",
+    "KwwwwwK.........",
+    "KwwwwwwK........",
+    "KwwwwwwwK.......",
+    "KwwwwwKKKK......",
+    "KwwKwCK.........",
+    "KwK.KwCK........",
+    "KK...KwCK.......",
+    "K.....KwCK......",
+    ".......KCK......",
+    "........K.......",
+]
+
+# ========================= MEDAGLIE 24x24 =============================
+# Tondo con nastro rosso scuro; cambia solo il metallo del disco. Le tre
+# versioni sono generate dallo stesso template sostituendo i caratteri
+# B (corpo), S (ombra), H (riflesso) — cosi' la sagoma resta identica.
+
+_MEDAGLIA_TEMPLATE = [
+    "........KxxK..KxxK......",
+    "........KxxK..KxxK......",
+    ".........KxxK.KxxK......",
+    ".........KxxKKxxK.......",
+    "..........KxxxxxxK......",
+    "..........KxxxxxxK......",
+    ".........KKKKKKKK.......",
+    ".......KKBBBBBBBBKK.....",
+    "......KBBHHBBBBBBBBK....",
+    ".....KBBHHBBBBBBBBBSK...",
+    ".....KBHHBBBBBBBBBBSK...",
+    "....KBBHBBBBBBBBBBSSSK..",
+    "....KBBBBBBBBBBBBBSSSK..",
+    "....KBBBBBBBBBBBBBSSSK..",
+    "....KBBBBBBBBBBBBBSSSK..",
+    "....KBBBBBBBBBBBBSSSSK..",
+    ".....KBBBBBBBBBBBSSSK...",
+    ".....KBBBBBBBBBBBSSSK...",
+    "......KBBBBBBBBBSSSK....",
+    ".......KKBBBBBBSSKK.....",
+    ".........KKKKKKKK.......",
+    "........................",
+    "........................",
+    "........................",
+]
+
+
+def _medaglia(corpo, ombra, riflesso):
+    tabella = str.maketrans({"B": corpo, "S": ombra, "H": riflesso})
+    return [riga.translate(tabella) for riga in _MEDAGLIA_TEMPLATE]
+
+
+MEDAGLIA_ORO = _medaglia("Y", "O", "w")
+MEDAGLIA_ARGENTO = _medaglia("l", "m", "w")
+MEDAGLIA_RAME = _medaglia("r", "x", "O")
+
+# ========================== MONETE 16x16 ==============================
+# Moneta d'oro che ruota su se stessa in 4 frame (piena, scorcio, taglio,
+# scorcio dall'altro lato) piu' la versione spenta (grigia, statica) per
+# le medaglie non d'oro nella schermata "livello completato".
+
+MONETA_1 = [
+    "....KKKKKKKK....",
+    "..KKYYYYYYYYKK..",
+    "..KYwwYYYYYYOK..",
+    ".KYwwYYYYYYYOOK.",
+    ".KYwYYYYYYYYOOK.",
+    ".KYYYYYYYYYYOOK.",
+    ".KYYYYYYYYYYOOK.",
+    ".KYYYYYYYYYYOOK.",
+    ".KYYYYYYYYYYOOK.",
+    ".KYYYYYYYYYYOOK.",
+    ".KYYYYYYYYYYOOK.",
+    ".KYYYYYYYYYYOOK.",
+    "..KYYYYYYYYYOK..",
+    "..KKYYYYYYYYKK..",
+    "....KKKKKKKK....",
+    "................",
+]
+
+MONETA_2 = [
+    "......KKKK......",
+    ".....KYYYYK.....",
+    "....KYwYYYOK....",
+    "....KYwYYYOK....",
+    "....KYYYYYOK....",
+    "....KYYYYYOK....",
+    "....KYYYYYOK....",
+    "....KYYYYYOK....",
+    "....KYYYYYOK....",
+    "....KYYYYYOK....",
+    "....KYYYYYOK....",
+    "....KYYYYYOK....",
+    "....KYYYYYOK....",
+    ".....KYYYYK.....",
+    "......KKKK......",
+    "................",
+]
+
+MONETA_3 = [
+    ".......KK.......",
+    "......KYOK......",
+    "......KYOK......",
+    "......KYOK......",
+    "......KYOK......",
+    "......KYOK......",
+    "......KYOK......",
+    "......KYOK......",
+    "......KYOK......",
+    "......KYOK......",
+    "......KYOK......",
+    "......KYOK......",
+    "......KYOK......",
+    "......KYOK......",
+    ".......KK.......",
+    "................",
+]
+
+# lo scorcio opposto e' lo specchio del frame 2
+MONETA_4 = [riga[::-1] for riga in MONETA_2]
+
+MONETA_SPENTA = [
+    riga.translate(str.maketrans({"Y": "g", "O": "D", "w": "m"}))
+    for riga in MONETA_1
+]
+
+
+# ======================= ICONE FACILITY 16x16 =========================
+# Le sei facility del Marketplace, in card e nell'HUD scorte. Silhouette
+# distinte: bombola, valvola che sfiata, chiave inglese, cassa, capsula,
+# sonda-trivella. Colori dominanti diversi per riconoscerle a colpo d'occhio.
+
+FAC_OSSIGENO = [
+    "......KKKK......",
+    "......KmlK......",
+    ".....KKllKK.....",
+    "....KCCCCCCK....",
+    "...KCCwwCCCcK...",
+    "...KCwwCCCCcK...",
+    "...KCwCCCCCcK...",
+    "...KCwCCCCCcK...",
+    "...KCCCCCCCcK...",
+    "...KCCCCCCccK...",
+    "...KCCCCCcccK...",
+    "...KCCCCCcccK...",
+    "...KcCCCCcccK...",
+    "....KccccccK....",
+    ".....KKKKKK.....",
+    "................",
+]
+
+FAC_SPURGO = [
+    "....O..w........",
+    "...w..O.........",
+    "..KKKKKK........",
+    "..KllllK........",
+    "...KllK.........",
+    "..KKmmKK........",
+    ".KmmmmmmK.......",
+    "KKmllllmKKKKKK..",
+    "KmmllllmmmmmmK..",
+    "KmmllllmmmmmmK..",
+    "KKmllllmKKKKKK..",
+    ".KmmmmmmK.......",
+    "..KKKKKK........",
+    "................",
+    "................",
+    "................",
+]
+
+FAC_RIPARAZIONE = [
+    ".........KKKK...",
+    "........KlwwlK..",
+    ".......KlwKKwK..",
+    ".......KlwK.KK..",
+    "......KKlwK.....",
+    "......KlwlK.....",
+    ".....KlwlK......",
+    "....KlwlK.......",
+    "...KlwlK........",
+    "..KlwlK.........",
+    ".KlwwlK.........",
+    "KKlwwlKK........",
+    "KlwKKwwlK.......",
+    "KlwK.KwlK.......",
+    ".KK...KK........",
+    "................",
+]
+
+FAC_STIVA = [
+    "................",
+    "..KKKKKKKKKKKK..",
+    ".KrrrrrrrrrrrrK.",
+    ".KrOrrrrrrrrOrK.",
+    ".KKKKKKKKKKKKKK.",
+    ".KrrKrrrrrrKrrK.",
+    ".KrrKrrrrrrKrrK.",
+    ".KrrKrrKKrrKrrK.",
+    ".KrrKrrKKrrKrrK.",
+    ".KrrKrrrrrrKrrK.",
+    ".KrrKrrrrrrKrrK.",
+    ".KKKKKKKKKKKKKK.",
+    ".KrrrrrrrrrrrrK.",
+    "..KKKKKKKKKKKK..",
+    "................",
+    "................",
+]
+
+FAC_COLONI = [
+    ".......KK.......",
+    "......KwwK......",
+    ".....KwwwwK.....",
+    "....KwwwwwwK....",
+    "....KwlwwlwK....",
+    "...KwwKKKKwwK...",
+    "...KwwKCCKwwK...",
+    "...KwKCCCCKwK...",
+    "...KwKCCcCKwK...",
+    "...KwwKCcKwwK...",
+    "...KwwKKKKwwK...",
+    "...KlwwwwwwlK...",
+    "..KKlKlwwlKlKK..",
+    "..KOOK.KK.KOOK..",
+    "...KK......KK...",
+    "................",
+]
+
+FAC_SONDA = [
+    "......KKK.......",
+    ".....KlwlK......",
+    ".....KlwlK......",
+    "....KllwllK.....",
+    "....KllwllK.....",
+    "....KmlwlmK.....",
+    "....KmlllmK.....",
+    "...KKmlllmKK....",
+    "...KOmlllmOK....",
+    "...KOKlllKOK....",
+    "....KKmmmKK.....",
+    ".....KmmmK......",
+    ".....KKmKK......",
+    "......KmK.......",
+    ".......K........",
+    "................",
+]
+
 SPRITES = {
+    "sprites/cursore.png": (CURSORE, 16, 16),
+    "sprites/facilities/ossigeno.png": (FAC_OSSIGENO, 16, 16),
+    "sprites/facilities/spurgo.png": (FAC_SPURGO, 16, 16),
+    "sprites/facilities/riparazione.png": (FAC_RIPARAZIONE, 16, 16),
+    "sprites/facilities/stiva.png": (FAC_STIVA, 16, 16),
+    "sprites/facilities/coloni.png": (FAC_COLONI, 16, 16),
+    "sprites/facilities/sonda.png": (FAC_SONDA, 16, 16),
+    "sprites/medaglie/oro.png": (MEDAGLIA_ORO, 24, 24),
+    "sprites/medaglie/argento.png": (MEDAGLIA_ARGENTO, 24, 24),
+    "sprites/medaglie/rame.png": (MEDAGLIA_RAME, 24, 24),
+    "sprites/monete/accesa_1.png": (MONETA_1, 16, 16),
+    "sprites/monete/accesa_2.png": (MONETA_2, 16, 16),
+    "sprites/monete/accesa_3.png": (MONETA_3, 16, 16),
+    "sprites/monete/accesa_4.png": (MONETA_4, 16, 16),
+    "sprites/monete/spenta.png": (MONETA_SPENTA, 16, 16),
     "sprites/moduli/reattore.png":     (REATTORE, 32, 32),
     "sprites/moduli/life_support.png": (LIFE_SUPPORT, 32, 32),
     "sprites/moduli/dormitorio.png":   (DORMITORIO, 32, 32),

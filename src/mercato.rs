@@ -167,6 +167,7 @@ pub fn sincronizza(
     mercato: Res<Mercato>,
     portafoglio: Res<Portafoglio>,
     station: Res<Station>,
+    art: Res<crate::Art>,
     q: Query<Entity, With<SchermataMercato>>,
 ) {
     let deve_esserci = mercato.aperto && *stato.get() == AppState::InGioco && !pausa.aperta;
@@ -229,15 +230,42 @@ pub fn sincronizza(
                 } else {
                     format!("{}  —  {}", f.nome, f.descrizione)
                 };
-                if let Some(motivo) = non_applicabile(f.effetto, &station) {
-                    r.spawn(testo(
-                        format!("{riga}  (qui non serve: {motivo})"),
-                        15.0,
-                        GRIGIO_SCAFO,
+                let icona = |c: &mut ChildSpawnerCommands, spenta: bool| {
+                    c.spawn((
+                        ImageNode {
+                            image: art.facilities[idx].clone(),
+                            color: if spenta { GRIGIO_MEDIO.into() } else { Color::WHITE },
+                            ..default()
+                        },
+                        Node {
+                            width: Val::Px(32.0),
+                            height: Val::Px(32.0),
+                            flex_shrink: 0.0,
+                            ..default()
+                        },
                     ));
+                };
+                if let Some(motivo) = non_applicabile(f.effetto, &station) {
+                    r.spawn(Node {
+                        flex_direction: FlexDirection::Row,
+                        align_items: AlignItems::Center,
+                        column_gap: Val::Px(8.0),
+                        ..default()
+                    })
+                    .with_children(|c| {
+                        icona(c, true);
+                        c.spawn(testo(
+                            format!("{riga}  (qui non serve: {motivo})"),
+                            15.0,
+                            GRIGIO_SCAFO,
+                        ));
+                    });
                 } else {
                     r.spawn((
                         Node {
+                            flex_direction: FlexDirection::Row,
+                            align_items: AlignItems::Center,
+                            column_gap: Val::Px(8.0),
                             padding: UiRect::axes(Val::Px(14.0), Val::Px(6.0)),
                             border: UiRect::all(Val::Px(1.0)),
                             ..default()
@@ -248,6 +276,7 @@ pub fn sincronizza(
                         VoceMercato(idx),
                     ))
                     .with_children(|c| {
+                        icona(c, false);
                         c.spawn(testo(riga, 15.0, METALLO));
                     });
                 }

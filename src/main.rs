@@ -54,6 +54,16 @@ pub struct Art {
     pub sfondo_stelle: Handle<Image>,
     /// Detrito che occupa una cella nei livelli della campagna.
     pub ostacolo: Handle<Image>,
+    /// Icone delle sei facility del Marketplace, nell'ordine di
+    /// `mercato::FACILITIES` (card, HUD scorte, overlay scorte).
+    pub facilities: [Handle<Image>; 6],
+    /// Freccia pixel-art usata come cursore custom della finestra.
+    pub cursore: Handle<Image>,
+    /// Medaglie della schermata "livello completato": oro, argento, rame.
+    pub medaglie: [Handle<Image>; 3],
+    /// I 4 frame dello spin della moneta d'oro + la versione spenta.
+    pub monete_accese: [Handle<Image>; 4],
+    pub moneta_spenta: Handle<Image>,
 }
 
 // Indici in `Art::corridoi`. Gli sprite base sono orientati così:
@@ -307,26 +317,40 @@ fn main() {
         .add_systems(
             Update,
             (
-                aggiorna_ghost,
-                aggiorna_visuali,
-                orienta_corridoi,
-                mercato::sincronizza,
-                prologo::sincronizza,
-                audio::suona_log,
-                audio::suona_arrivi,
-                audio::suona_click,
-                musica::gestisci_musica,
-                musica::applica_volume,
-                menu::aggiorna_voci_volume,
-                menu::aggiorna_voci_marketplace,
-                screenshot_tasto,
-                demo_foto,
-                visibilita_scena,
-                ui::visibilita_gioco,
-                ui::update_hud,
-                ui::update_palette,
-                ui::update_log,
-                ui::update_ispezione,
+                // scena e overlay
+                (
+                    aggiorna_ghost,
+                    aggiorna_visuali,
+                    orienta_corridoi,
+                    mercato::sincronizza,
+                    prologo::sincronizza,
+                    visibilita_scena,
+                ),
+                // audio e musica
+                (
+                    audio::suona_log,
+                    audio::suona_arrivi,
+                    audio::suona_click,
+                    musica::gestisci_musica,
+                    musica::applica_volume,
+                ),
+                // etichette dinamiche, servizi e pannelli UI
+                (
+                    menu::aggiorna_voci_volume,
+                    menu::aggiorna_voci_marketplace,
+                    menu::anima_monete,
+                    screenshot_tasto,
+                    demo_foto,
+                    cursore_pixel,
+                ),
+                (
+                    ui::visibilita_gioco,
+                    ui::update_hud,
+                    ui::update_palette,
+                    ui::update_scorte_hud,
+                    ui::update_log,
+                    ui::update_ispezione,
+                ),
             )
                 .after(applica_reset),
         )
@@ -382,6 +406,27 @@ fn carica_art(mut commands: Commands, assets: Res<AssetServer>) {
         ],
         sfondo_stelle: assets.load("sprites/sfondo/stelle.png"),
         ostacolo: assets.load("sprites/ostacolo.png"),
+        facilities: [
+            assets.load("sprites/facilities/ossigeno.png"),
+            assets.load("sprites/facilities/riparazione.png"),
+            assets.load("sprites/facilities/coloni.png"),
+            assets.load("sprites/facilities/stiva.png"),
+            assets.load("sprites/facilities/spurgo.png"),
+            assets.load("sprites/facilities/sonda.png"),
+        ],
+        cursore: assets.load("sprites/cursore.png"),
+        medaglie: [
+            assets.load("sprites/medaglie/oro.png"),
+            assets.load("sprites/medaglie/argento.png"),
+            assets.load("sprites/medaglie/rame.png"),
+        ],
+        monete_accese: [
+            assets.load("sprites/monete/accesa_1.png"),
+            assets.load("sprites/monete/accesa_2.png"),
+            assets.load("sprites/monete/accesa_3.png"),
+            assets.load("sprites/monete/accesa_4.png"),
+        ],
+        moneta_spenta: assets.load("sprites/monete/spenta.png"),
     });
 }
 
@@ -704,12 +749,15 @@ fn input_mouse(
 }
 
 /// L'anteprima usa lo sprite del modulo selezionato, snappata alla cella.
+#[allow(clippy::too_many_arguments)]
 fn aggiorna_ghost(
     sel: Res<Selected>,
     art: Res<Art>,
     griglia: Res<Griglia>,
     station: Res<Station>,
     pausa: Res<Pausa>,
+    prologo_res: Res<prologo::Prologo>,
+    scorte: Res<mercato::Mercato>,
     stato: Res<State<AppState>>,
     finestre: Query<&Window, With<PrimaryWindow>>,
     camere: Query<(&Camera, &GlobalTransform)>,
@@ -718,7 +766,13 @@ fn aggiorna_ghost(
     let Ok((mut sprite, mut tf, mut vis)) = q.single_mut() else {
         return;
     };
-    if pausa.aperta || *stato.get() != AppState::InGioco {
+    // niente anteprima sotto gli overlay: con prologo o scorte aperti il
+    // giocatore non sta piazzando (e il click è comunque bloccato)
+    if pausa.aperta
+        || prologo_res.pagina.is_some()
+        || scorte.aperto
+        || *stato.get() != AppState::InGioco
+    {
         *vis = Visibility::Hidden;
         return;
     }
@@ -926,6 +980,33 @@ fn visibilita_scena(
     for mut vis in &mut q {
         *vis = v;
     }
+}
+
+/// Sostituisce il cursore di sistema con la freccia pixel-art appena
+/// l'immagine è caricata (una volta sola): l'hotspot (0,0) è la punta,
+/// come disegnata in `gen_sprites.py`.
+fn cursore_pixel(
+    mut fatto: Local<bool>,
+    immagini: Res<Assets<Image>>,
+    art: Res<Art>,
+    finestre: Query<Entity, With<PrimaryWindow>>,
+    mut commands: Commands,
+) {
+    use bevy::window::{CursorIcon, CustomCursor, CustomCursorImage};
+    if *fatto || immagini.get(&art.cursore).is_none() {
+        return;
+    }
+    let Ok(finestra) = finestre.single() else {
+        return;
+    };
+    commands
+        .entity(finestra)
+        .insert(CursorIcon::Custom(CustomCursor::Image(CustomCursorImage {
+            handle: art.cursore.clone(),
+            hotspot: (0, 0),
+            ..default()
+        })));
+    *fatto = true;
 }
 
 /// F12: screenshot della finestra nella cartella corrente, in ogni schermata.

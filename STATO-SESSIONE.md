@@ -1,129 +1,102 @@
-# Stato sessione — 25 luglio 2026, tarda sera
+# Stato sessione — 26 luglio 2026, notte
 
 ## Attività in corso
-Attesa esito CI del tag `v0.4.0` (run `30172690885`, avviato alle 19:59:37
-UTC, ancora **in_progress** al momento di questo aggiornamento: tutti e tre
-i job — `linux`, `windows`, `arch` — sono fermi allo step "Build binary",
-nessuno step precedente fallito).
+Attesa esito CI del tag `v0.5.0` (run `30180279242`, avviato alle
+23:56:10 UTC, ancora **in_progress** al momento di questo aggiornamento:
+job `arch`, `linux`, `windows` tutti avviati, nessuno step segnalato come
+fallito finora).
 
 ## Appena completato
-La v0.3.0 è COMPLETA in release (3 artefatti, tag `v0.3.0`, run
-`30171337920` concluso con successo). Poi, con 4 fork Fable in parallelo +
-1 agente Sonnet + main loop, è stata costruita e taggata la v0.4.0 (commit
-`4406100` + `65dd47e`, CI in corso):
+La v0.4.0 è COMPLETA in release (3 artefatti). Poi, con 2 fork Fable + 1
+agente Sonnet + main loop, sono state implementate insieme tre richieste
+utente, commit `643586b`, tag `v0.5.0`:
 
-1. **Storia nel gioco** (fork E): `STORIA.md` = bibbia narrativa (stazione
-   Aurora morta 10 anni fa in un blackout a catena; i 5 personaggi tutti
-   reduci/orfani di quella notte; i detriti dei livelli sono i suoi resti;
-   tono ironico sul presente + drammatico sul passato). In gioco: battuta
-   di briefing per tutti i 50 livelli, 5 intermezzi "diario di bordo" ai
-   livelli 1/11/21/31/41 (nuovo `AppState::Intermezzo` in `menu.rs`,
-   mostrato solo la prima volta che si raggiunge il livello,
-   `Azione::ApriBriefing` per continuare), annunci sblocco riscritti,
-   finale di 10 righe (Ilse) nella schermata dell'ultimo livello.
-2. **Audio effetti** (fork F + cablaggio): 10 WAV chiptune da
-   `tools/gen_audio.py` (deterministico, picco 0.5); `src/audio.rs`:
-   risorsa `Suoni`, `suona()` con volume, sistemi `suona_log` (gravità
-   log, max 1/frame), `suona_arrivi`, `suona_click`, `suona_completato`
-   (sblocco vs vittoria), `suona_sconfitta`; cablati anche
-   costruzione/rimozione (`input_mouse`) e acquisto (`mercato`). `EventLog`
-   ha contatore `totale()` mai azzerato per contare le righe nuove.
-   Feature bevy `wav`.
-3. **Colonna sonora** (fork H): `tools/gen_musica.py` (compositore
-   chiptune stdlib + ffmpeg→OGG, output byte-identico tra run) → 7 tracce
-   in `assets/musica/` (menu, cantiere, termica, reliquie, officina,
-   vigilia, finale; ~60-70s l'una, temi ricorrenti Cantiere/Aurora).
-   `src/musica.rs`: `TRACCE`, `StatoMusica`, `gestisci_musica`
-   (menu→traccia 0; campagna→traccia del blocco narrativo del livello;
-   sandbox→pescata a caso al reset con `pesca_casuale` in
-   `applica_reset`), `applica_volume` live.
-4. **Impostazioni** (`src/impostazioni.rs`): volumi musica/effetti 0-100 a
-   passi del 25, `ciclo()` nel menu di pausa (2 voci nuove,
-   `Azione::CicloMusica`/`CicloEffetti`, etichette aggiornate via
-   `Voce.etichetta` perché `evidenzia_voci` le ricopia), persistiti in
-   `impostazioni.txt` (`cartella_dati` di `livelli.rs` ora `pub(crate)`).
-5. **Screenshot**: tasto F12 (salva nella cwd) e modalità
-   `DEMO_FOTO=<dir>` (il gioco si avvia da solo, costruisce una stazione
-   demo, scatta titolo/costruzione/partita ed esce; estratta
-   `costruisci_modulo()` da `input_mouse` per riuso). Usata per
-   `docs/img/titolo|costruzione|partita.png` (la "partita" ha catturato
-   una cascata di guasti reale).
-6. **Manuale zine** (agente Sonnet 5, richiesta esplicita utente con
-   reference visiva stile "Muffin Time"): `docs/manuale.html` (~228KB
-   self-contained, 20 immagini data-URI, tono ironico, palette del gioco)
-   + `docs/manuale.pdf` (21 pagine A4 via chromium headless). Pubblicato
-   come artifact:
+1. **Prologo a fumetto** (fork P, nuovo `src/prologo.rs`): all'avvio di
+   ogni livello campagna/casuale la griglia si oscura (nero 0.88, z=18):
+   pagina 0 = ritratto 160px + battuta del livello in nuvola di fumetto
+   bianca (border_radius, coda a 3 pallini) + "Avanti →"; pagina 1 =
+   titolo/obiettivo/budget/detriti + "← Indietro" e "Gioca!". Risorsa
+   `Prologo{pagina:Option<u8>}`, attivata da `applica_reset`; input di
+   costruzione/tastiera/mercato bloccati con
+   `run_if(not(prologo::attivo))`; il briefing classico resta.
+2. **Marketplace** (fork M + nuovo `src/progressi.rs`): `AppState::Marketplace`
+   dal titolo (voce idx 4, n=8): catalogo FACILITIES a CREDITI (Scorta O2
+   2, Spurgo 2, Riparazione 3, Stiva 3, Coloni 4, Sonda 5), acquisto →
+   scorte persistenti; in partita M/bottone "SCORTE m" apre l'inventario
+   (`mercato.rs` ridisegnato: `click_scorte` consuma via
+   `Portafoglio::usa` e applica l'effetto; scorte non applicabili mostrate
+   spente). Niente più offerte casuali né costi in punti partita.
+3. **Timer e medaglie**: HUD `TEMPO m:ss` countdown (giallo ≤25%, rosso
+   ≤10%) al posto di `TICK n/tetto`; al completamento livello campagna
+   medaglia oro/argento/rame (soglie 40%/70%/100% del tetto,
+   `progressi::medaglia_per_tempo`), colorata nella griglia di selezione
+   (GIALLO/BIANCO/RUGGINE via componente `ColoreFisso` rispettato da
+   `evidenzia_voci`), mostrata nella schermata completato (risorsa
+   `livelli::UltimaMedaglia`), crediti una tantum solo al miglioramento
+   (1/2/3, `Portafoglio::registra_livello`), persistenza in
+   `progressi.txt` (cartella dati, formato `chiave=valore`:
+   crediti/medaglie/scorte).
+4. **Docs**: `MANUALE.md` (§4 medaglie+prologo, §5 "Il Marketplace e le
+   scorte"), `GUIDA.md` (timer/medaglie/M), zine `docs/manuale.html`+pdf
+   aggiornata da agente Sonnet (22 pagine, verificata sul codice) e
+   ripubblicata sullo stesso artifact:
    https://claude.ai/code/artifact/ff20f694-c945-4f72-9724-032f501f2345 .
-   Su richiesta utente rimossa la nota tecnica finale (testo "Il testo di
-   questo manuale è MANUALE.md..."). Il `MANUALE.md` testuale ha ora
-   schede personaggi con spessore (fork G: passato/carattere/citazioni
-   verificate), sezioni La storia e L'audio (+paragrafo colonna sonora e
-   impostazioni), `GUIDA.md` aggiornata (comandi con `7890C`, `M`, `F12`,
-   volumi).
-7. **HANDOFF.md**: reso file LOCALE (`git rm --cached`, escluso via
-   `.git/info/exclude`, riferimento tolto dal README) con addendum
-   leggero in testa che rimanda a `STATO-SESSIONE.md` — c'è un hook
-   PostToolUse che chiede di aggiornarlo a ogni commit.
+   `HANDOFF.md` locale aggiornato.
+5. **Nota tecnica**: nuovo colore `pub RUGGINE` in `ui.rs`; fix
+   pattern-matching edition 2024 in `mercato.rs` (`conteggio_scorte`).
 
 ## Prossimo passo immediato
-Verificare l'esito della CI del tag `v0.4.0` (run `30172690885`,
-`gh run view 30172690885` o `gh run watch 30172690885`); se un job
-fallisce, sistemare e ritaggare.
+Verificare l'esito della CI del tag `v0.5.0` (run `30180279242`,
+`gh run view 30180279242` o `gh run watch 30180279242`); se un job
+fallisce, sistemare e ritaggare. Se verde, comunicare che la release è
+pronta sui 3 artefatti.
 
 ## Passi successivi
-1. Esito CI v0.4.0 → se verde, comunicare che la release è pronta sui 3
-   artefatti.
-2. Playtest completo dell'utente: storia (intermezzi, briefing, finale),
-   musica per blocco narrativo, volumi in impostazioni, mercato interno,
-   moduli sbloccabili — quasi tutto tarato a tavolino, mai giocato da un
-   umano.
-3. Da `SPEC-CAMPAGNA.md` §9 restano (non ancora approvate): eventi con
-   scelta, riparazione con costo, velocità 1×/2×/4×, stelle per livello,
-   sfida del giorno.
-4. Tratti passivi dei personaggi (proposta non implementata).
-5. Bilanciamento generale mai playtestato: curva del generatore, costi di
-   mercato, numeri dei moduli.
-6. Warning del compilatore da sistemare (vedi sotto): variabile `def`
-   inutilizzata in `src/main.rs:668` — piccola pulizia rimasta indietro,
-   non blocca la release ma andrebbe tolta al prossimo giro.
+1. Esito CI v0.5.0 → se verde, release pronta.
+2. Playtest completo dell'utente: prologo, marketplace col giro
+   medaglie→crediti→scorte, timer — tutto tarato a tavolino (soglie
+   40/70, crediti 1/2/3, costi 2-5), mai giocato da un umano.
+3. Nota aperta: i vecchi salvataggi hanno livelli completati senza
+   medaglia registrata (colore assente in griglia finché non li
+   rigiocano) — comportamento atteso, non un bug, ma da tenere a mente
+   nel playtest.
+4. Da `SPEC-CAMPAGNA.md` §9 restano (non ancora approvate): eventi con
+   scelta, riparazione con costo, velocità 1×/2×/4×, stelle per livello
+   (da valutare se superate dalle medaglie), sfida del giorno.
+5. Tratti passivi dei personaggi (proposta non implementata).
+6. Bilanciamento generale mai playtestato: curva del generatore, costi
+   di marketplace, soglie/crediti delle medaglie, numeri dei moduli.
 
 ## Stato di verifica
-- Verificato io stesso, ora: `cargo build --quiet` compila, ma **non a 0
-  warning** come riferito dallo snapshot precedente — emette 1 warning
-  (`unused variable: def` in `src/main.rs:668`). Discrepanza segnalata:
-  mi fido del filesystem/compilatore, non del riassunto ricevuto.
-- Verificato io stesso, ora: `cargo test --quiet` — 28/28 passati.
-- Verificato io stesso, ora: `git log` mostra `65dd47e` in testa su
-  `main` (preceduto da `4406100`, `98759c8`, `7439828`, ...); tag
-  `v0.1.0`/`v0.2.0`/`v0.3.0`/`v0.4.0` presenti; `git status` pulito
-  (nessuna modifica non committata, branch allineato a `origin/main`).
-- Verificato io stesso, ora, sul filesystem: `STORIA.md`, `src/audio.rs`,
-  `src/musica.rs`, `src/impostazioni.rs`, `docs/manuale.html`,
-  `docs/manuale.pdf` esistono; `assets/musica/` contiene le 7 tracce OGG
-  attese (menu, cantiere, termica, reliquie, officina, vigilia, finale);
-  10 WAV effetti presenti; `Cargo.toml` riporta `version = "0.4.0"`;
-  `AppState::Intermezzo` presente in `src/menu.rs`.
-- Verificato io stesso, ora: `HANDOFF.md` esiste su disco ma **non** è
-  tracciato da git (`git ls-files HANDOFF.md` vuoto), è elencato in
-  `.git/info/exclude`, e `README.md` non lo menziona più — coerente col
-  riassunto ricevuto.
-- Verificato io stesso, ora, via `gh run view 30172690885 --json
-  status,conclusion,jobs`: i tre job (`linux`, `windows`, `arch`) sono
-  **in_progress**, tutti fermi allo step "Build binary" — nessuno step
-  precedente fallito, ma build non ancora completata né confermata verde.
-  Release GitHub mostra ancora `v0.3.0` come ultima pubblicata.
-- Non provato da me: smoke test del gioco in esecuzione (storia, audio,
-  musica per blocco, volumi, mercato) — riferito come verificato dalla
-  sessione precedente ma non ri-eseguito qui; nessun playtest umano
-  completo finora.
+- Verificato io stesso, ora: `cargo build --quiet` compila **a 0
+  warning** (nessuna riga in output).
+- Verificato io stesso, ora: `cargo test --quiet` — **31/31** test
+  passati (coerente col riassunto ricevuto).
+- Verificato io stesso, ora: `git log` mostra `643586b` in testa su
+  `main`; tag `v0.5.0` presente e puntato allo stesso commit; `Cargo.toml`
+  riporta `version = "0.5.0"`. `git status`: pulito tranne `Cargo.lock`
+  modificato ma non in staging (probabile aggiornamento locale non
+  ancora committato, non blocca nulla).
+- Verificato io stesso, ora, sul filesystem: `src/prologo.rs` e
+  `src/progressi.rs` esistono. `progressi.txt` **non** trovato nella
+  radice del repo — cercando nel codice, il file vive nella "cartella
+  dati" restituita da `cartella_dati()` (stessa dove sta
+  `impostazioni.txt`), non nella root: nessuna discrepanza, solo percorso
+  diverso da dove l'ho cercato prima.
+- Verificato io stesso, ora, via `gh run list` e `gh run view
+  30180279242`: run `30180279242` per il tag `v0.5.0`, trigger push,
+  **in_progress**, job `arch`/`linux`/`windows` avviati da poco (~1-2
+  minuti), nessun fallimento segnalato. Coerente col riassunto ricevuto
+  ("CI in corso").
+- Non riprovato da me in questa passata: smoke test del gioco in
+  esecuzione (prologo, marketplace, timer/medaglie) — riferito come
+  verificato dalla sessione precedente ma non ri-eseguito qui; nessun
+  playtest umano completo finora.
 
 ## Decisioni prese in sessione
-- Mercato interno: pagamento SOLO in punti partita, nessuna valuta reale
-  — scelta esplicita dell'utente (ereditata dalla sessione precedente,
-  ancora valida).
-- Personaggi: implementata la parte narrativa (battute, intermezzi,
-  finale, annunci di sblocco); i tratti passivi restano deliberatamente
-  non implementati, in attesa di ulteriore richiesta esplicita.
-- HANDOFF.md declassato a file locale non versionato, con
-  STATO-SESSIONE.md come unico riferimento condiviso nel repo per la
-  ripresa di sessione.
+- Marketplace: pagamento SOLO coi crediti guadagnati dalle medaglie,
+  nessuna valuta reale — scelta esplicita dell'utente, in continuità con
+  la decisione precedente sul mercato interno (ora sostituito da questo
+  sistema).
+- Timer e medaglie: soglie (40%/70%/100%) e crediti (1/2/3) tarati a
+  tavolino dall'utente/sessione, non ancora validati da playtest.

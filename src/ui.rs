@@ -44,6 +44,11 @@ pub struct BottoneMenu;
 #[derive(Component)]
 pub struct BottoneMercato;
 
+/// La fila di iconcine delle scorte possedute, accanto al bottone SCORTE:
+/// a colpo d'occhio cosa hai in magazzino (M apre l'inventario).
+#[derive(Component)]
+pub struct ScorteHud;
+
 #[derive(Component, Clone, Copy)]
 pub enum CampoHud {
     Stato,
@@ -257,6 +262,16 @@ pub fn setup_ui(mut commands: Commands, art: Res<Art>) {
                 .with_children(|c| {
                     c.spawn((testo("", 13.0, GRIGIO_MEDIO), CampoHud::Punteggio));
                 });
+                hud.spawn((
+                    Node {
+                        flex_direction: FlexDirection::Row,
+                        align_items: AlignItems::Center,
+                        column_gap: Val::Px(4.0),
+                        margin: UiRect::right(Val::Px(8.0)),
+                        ..default()
+                    },
+                    ScorteHud,
+                ));
                 hud.spawn((
                     Node {
                         padding: UiRect::axes(Val::Px(12.0), Val::Px(5.0)),
@@ -690,6 +705,44 @@ pub fn click_palette(
             sel.0 = KINDS[slot.0];
         }
     }
+}
+
+/// Ricostruisce la fila di iconcine delle scorte quando l'inventario
+/// cambia: una per tipo posseduto, con "×N" oltre la prima. A magazzino
+/// vuoto la fila è semplicemente vuota (zero figli, zero ingombro).
+pub fn update_scorte_hud(
+    mut commands: Commands,
+    portafoglio: Res<crate::progressi::Portafoglio>,
+    art: Res<Art>,
+    q: Query<Entity, With<ScorteHud>>,
+    mut primo: Local<bool>,
+) {
+    if *primo && !portafoglio.is_changed() {
+        return;
+    }
+    *primo = true;
+    let Ok(fila) = q.single() else {
+        return;
+    };
+    let scorte = crate::mercato::conteggio_scorte(&portafoglio.scorte);
+    commands
+        .entity(fila)
+        .despawn_children()
+        .with_children(|p| {
+            for (idx, quante) in scorte {
+                p.spawn((
+                    ImageNode::new(art.facilities[idx].clone()),
+                    Node {
+                        width: Val::Px(20.0),
+                        height: Val::Px(20.0),
+                        ..default()
+                    },
+                ));
+                if quante > 1 {
+                    p.spawn(testo(format!("×{quante}"), 11.0, GRIGIO_MEDIO));
+                }
+            }
+        });
 }
 
 /// Il tasto MENU dell'HUD apre l'overlay di pausa, identico a Esc.
