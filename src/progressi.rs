@@ -1,11 +1,15 @@
 //! Progressi persistenti del giocatore oltre la progressione di campagna:
 //! medaglie per livello, crediti e scorte del Marketplace.
 //!
-//! Le medaglie premiano la VELOCITÀ: completare un livello entro il 40%
-//! del tempo limite vale l'oro, entro il 70% l'argento, entro il limite il
-//! rame. I crediti sono volutamente pochi (3/2/1 per medaglia, e solo la
-//! DIFFERENZA quando si migliora una medaglia già presa): gli aiuti del
-//! Marketplace accorciano i livelli, non devono essere gratis.
+//! Le medaglie premiano la VELOCITÀ: completare un livello entro il 35%
+//! del tempo limite vale l'oro, entro il 60% l'argento, entro il limite il
+//! rame. (Erano 40/70: il playtest faceva oro troppo spesso. Non scendere
+//! sotto il 35: l'obiettivo intrinsecamente più lungo dei 50 livelli vale
+//! ~130 tick e la soglia oro su 400 è 140 — l'oro deve restare possibile
+//! OVUNQUE, e un test in generatore.rs lo garantisce.) I crediti sono
+//! volutamente pochi (3/2/1 per medaglia, e solo la DIFFERENZA quando si
+//! migliora una medaglia già presa): gli aiuti del Marketplace accorciano
+//! i livelli, non devono essere gratis.
 //!
 //! Persistenza in `progressi.txt` (cartella dati): righe `chiave=valore`,
 //! stesso patto dei file classifica — una riga rotta si salta, file
@@ -24,12 +28,17 @@ pub const RAME: Medaglia = 1;
 /// Crediti guadagnati da una medaglia (indice = medaglia).
 const CREDITI_PER_MEDAGLIA: [u32; 4] = [0, 1, 2, 3];
 
+/// Soglie delle medaglie in percento del tetto: UNICA definizione, usata
+/// anche dalla UI per mostrare i tempi da battere.
+pub const SOGLIA_ORO_PERCENTO: u64 = 35;
+pub const SOGLIA_ARGENTO_PERCENTO: u64 = 60;
+
 /// La medaglia per un livello completato in `tick` su un tetto di `tetto`.
 /// Chi completa ha SEMPRE almeno il rame: il tetto stesso è la soglia.
 pub fn medaglia_per_tempo(tick: u64, tetto: u64) -> Medaglia {
-    if tick * 10 <= tetto * 4 {
+    if tick * 100 <= tetto * SOGLIA_ORO_PERCENTO {
         ORO
-    } else if tick * 10 <= tetto * 7 {
+    } else if tick * 100 <= tetto * SOGLIA_ARGENTO_PERCENTO {
         ARGENTO
     } else {
         RAME
@@ -154,11 +163,11 @@ mod test {
     use super::*;
 
     #[test]
-    fn le_soglie_delle_medaglie_sono_40_e_70_percento() {
-        assert_eq!(medaglia_per_tempo(160, 400), ORO);
-        assert_eq!(medaglia_per_tempo(161, 400), ARGENTO);
-        assert_eq!(medaglia_per_tempo(280, 400), ARGENTO);
-        assert_eq!(medaglia_per_tempo(281, 400), RAME);
+    fn le_soglie_delle_medaglie_sono_35_e_60_percento() {
+        assert_eq!(medaglia_per_tempo(140, 400), ORO);
+        assert_eq!(medaglia_per_tempo(141, 400), ARGENTO);
+        assert_eq!(medaglia_per_tempo(240, 400), ARGENTO);
+        assert_eq!(medaglia_per_tempo(241, 400), RAME);
         assert_eq!(medaglia_per_tempo(400, 400), RAME);
     }
 

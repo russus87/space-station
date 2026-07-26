@@ -1,24 +1,30 @@
-//! Prologo del livello: l'overlay a fumetto grande che offusca la griglia
-//! all'avvio di una partita di campagna o casuale.
+//! Prologo del livello: l'overlay che offusca la griglia all'avvio di una
+//! partita di campagna o casuale. Dalla v0.7 è anche il libretto: la
+//! schermata di briefing non esiste più, obiettivo e numeri si leggono qui.
 //!
-//! Due pagine: la prima è il personaggio in grande con la sua battuta in
-//! una nuvola di fumetto vera (carta bianca, coda a pallini); la seconda è
-//! l'obiettivo del livello con "Indietro" e "Gioca!". Il briefing testuale
-//! pre-partita resta dov'è: questo è il sipario, non il libretto.
+//! Due pagine: la VIGNETTA (il personaggio in grande dentro una cornice da
+//! fumetto, col balloon di carta e la coda) e l'OBIETTIVO (nome, briefing,
+//! numeri del livello, medaglia in bacheca e tempi da battere, "Gioca!").
+//! L'obiettivo si mostra a OGNI avvio del livello; la vignetta solo la
+//! prima volta che quel livello si vede nella sessione: "Riprova il
+//! livello" va dritto all'obiettivo.
 //!
 //! Lo accende `applica_reset` chiamando `Prologo::richiedi(chiave)`, solo
-//! per Campagna e Casuale e solo la PRIMA volta che quel livello si vede
-//! nella sessione: "Riprova il livello" non rilegge il sipario. Finché è
-//! acceso, `attivo` fa da run condition per bloccare gli input di
-//! costruzione in `main.rs`. Il menu di pausa (Esc) passa sopra: l'overlay
-//! si nasconde e ricompare alla chiusura. Si naviga a mouse o tastiera
-//! (Invio/Spazio avanti, Backspace/freccia sinistra indietro).
+//! per Campagna e Casuale. Finché è acceso, `attivo` fa da run condition
+//! per bloccare gli input di costruzione in `main.rs`. Il menu di pausa
+//! (Esc) passa sopra: l'overlay si nasconde e ricompare alla chiusura. Si
+//! naviga a mouse o tastiera (Invio/Spazio avanti, Backspace/freccia
+//! sinistra indietro quando la vignetta esiste).
 
 use crate::Art;
 use crate::livelli::{LIVELLI, LivelloCasuale, LivelloDef, Modalita};
 use crate::menu::{AppState, Pausa};
 use crate::personaggi::{PERSONAGGI, battuta_briefing};
-use crate::ui::{BIANCO, CIANO, GIALLO, GRIGIO_MEDIO, GRIGIO_SCAFO, METALLO, NERO, VERDE};
+use crate::progressi::{ARGENTO, Medaglia, ORO, Portafoglio, medaglia_per_tempo};
+use crate::sim::{TICK_MASSIMO, TICK_SECS};
+use crate::ui::{
+    BIANCO, CIANO, GIALLO, GRIGIO_MEDIO, GRIGIO_SCAFO, METALLO, NERO, RUGGINE, SCAFO_SCURO, VERDE,
+};
 use bevy::platform::collections::HashSet;
 use bevy::prelude::*;
 use std::hash::{DefaultHasher, Hash, Hasher};
@@ -29,25 +35,29 @@ use std::hash::{DefaultHasher, Hash, Hasher};
 const FRASE_DI_SERVIZIO: (usize, &str) =
     (0, "Settore sconosciuto. Regole solite: aria, corrente, margine.");
 
-/// Pagina corrente del prologo: `None` = spento, `Some(0)` = personaggio,
-/// `Some(1)` = obiettivo. Attivato da `applica_reset` via `richiedi`.
+/// Pagina corrente del prologo: `None` = spento, `Some(0)` = vignetta col
+/// personaggio, `Some(1)` = obiettivo. Attivato da `applica_reset` via
+/// `richiedi`.
 #[derive(Resource, Default)]
 pub struct Prologo {
     pub pagina: Option<u8>,
-    /// Chiavi dei livelli già presentati in questa sessione: il sipario si
-    /// alza una volta sola per livello, i retry vanno dritti al cantiere.
+    /// La vignetta esiste per questo avvio? Vero solo alla prima visita
+    /// del livello: decide se "← Indietro" e Backspace hanno un posto
+    /// dove tornare.
+    con_fumetto: bool,
+    /// Chiavi dei livelli già presentati in questa sessione: la vignetta
+    /// si mostra una volta sola per livello, i retry partono
+    /// dall'obiettivo.
     visti: HashSet<u64>,
 }
 
 impl Prologo {
-    /// Apre il prologo solo se `chiave` non è mai stata vista; altrimenti
-    /// lo assicura chiuso (un reset non deve ereditare pagine sospese).
+    /// Apre il prologo: dalla vignetta se `chiave` non è mai stata vista,
+    /// direttamente dalla pagina obiettivo altrimenti (l'obiettivo si
+    /// legge a ogni avvio: è il libretto del livello, non il sipario).
     pub fn richiedi(&mut self, chiave: u64) {
-        self.pagina = if self.visti.insert(chiave) {
-            Some(0)
-        } else {
-            None
-        };
+        self.con_fumetto = self.visti.insert(chiave);
+        self.pagina = Some(if self.con_fumetto { 0 } else { 1 });
     }
 }
 
@@ -61,11 +71,6 @@ pub fn chiave_casuale(livello: &LivelloDef) -> u64 {
     livello.max_moduli.hash(&mut h);
     livello.ostacoli.hash(&mut h);
     h.finish() | 0x8000_0000_0000_0000
-}
-
-/// Run condition: finché il prologo è a schermo, niente input di gioco.
-pub fn attivo(p: Res<Prologo>) -> bool {
-    p.pagina.is_some()
 }
 
 #[derive(Component)]
@@ -147,6 +152,7 @@ pub fn sincronizza(
     prologo: Res<Prologo>,
     modalita: Res<Modalita>,
     casuale: Res<LivelloCasuale>,
+    portafoglio: Res<Portafoglio>,
     art: Res<Art>,
     q: Query<Entity, With<SchermataPrologo>>,
 ) {
@@ -166,7 +172,7 @@ pub fn sincronizza(
         return;
     }
     let (livello, indice, (chi, battuta)) = dati.unwrap();
-    let pagina = prologo.pagina.unwrap_or(0);
+    let pagina = prologo.pagina.unwrap_or(1);
 
     commands
         .spawn((
@@ -189,77 +195,160 @@ pub fn sincronizza(
             if pagina == 0 {
                 pagina_personaggio(r, &art, chi, battuta);
             } else {
-                pagina_obiettivo(r, livello, indice);
+                pagina_obiettivo(r, livello, indice, prologo.con_fumetto, &portafoglio);
             }
         });
 }
 
-/// Pagina 0: la nuvola di fumetto sopra, la coda a pallini, il ritratto
-/// grande sotto — il classico balloon dei fumetti, in carta bianca.
+/// Minuti:secondi per un numero di tick, nella lingua del timer dell'HUD.
+fn tick_in_tempo(tick: u64) -> String {
+    let secondi = (tick as f32 * TICK_SECS) as u64;
+    format!("{}:{:02}", secondi / 60, secondi % 60)
+}
+
+/// Il tick più alto che vale ancora ALMENO la medaglia data: si sonda
+/// `medaglia_per_tempo` per bisezione, così le soglie mostrate sono sempre
+/// quelle vere di `progressi.rs`, qualunque taratura abbiano.
+fn soglia_massima(medaglia: Medaglia, tetto: u64) -> u64 {
+    let (mut lo, mut hi) = (0u64, tetto);
+    while lo < hi {
+        let meta = (lo + hi).div_ceil(2);
+        if medaglia_per_tempo(meta, tetto) >= medaglia {
+            lo = meta;
+        } else {
+            hi = meta - 1;
+        }
+    }
+    lo
+}
+
+/// Pagina 0: la vignetta — una cornice da tavola di fumetto che contiene
+/// tutto: ritratto grande a sinistra, nome/ruolo e balloon di carta a
+/// destra, con la coda a gradini (pixel, non pallini) rivolta al ritratto.
 fn pagina_personaggio(r: &mut ChildSpawnerCommands, art: &Art, chi: usize, battuta: &str) {
     let personaggio = &PERSONAGGI[chi];
-    // nuvola
+    // la cornice della vignetta
     r.spawn((
         Node {
-            max_width: Val::Px(560.0),
-            padding: UiRect::axes(Val::Px(26.0), Val::Px(18.0)),
-            border_radius: BorderRadius::all(Val::Px(28.0)),
+            flex_direction: FlexDirection::Row,
+            align_items: AlignItems::Center,
+            column_gap: Val::Px(24.0),
+            padding: UiRect::all(Val::Px(28.0)),
+            border: UiRect::all(Val::Px(2.0)),
+            border_radius: BorderRadius::all(Val::Px(4.0)),
+            max_width: Val::Px(680.0),
             ..default()
         },
-        BackgroundColor(BIANCO),
+        BackgroundColor(SCAFO_SCURO),
+        BorderColor::all(GRIGIO_SCAFO),
     ))
-    .with_children(|c| {
-        c.spawn(testo(battuta, 18.0, NERO));
-    });
-    // coda a pallini, sfalsata verso il ritratto
-    for (lato, scarto) in [(14.0, 30.0), (9.0, 12.0), (5.0, 0.0)] {
-        r.spawn((
-            Node {
-                width: Val::Px(lato),
-                height: Val::Px(lato),
-                margin: UiRect::left(Val::Px(scarto)),
-                border_radius: BorderRadius::MAX,
+    .with_children(|vignetta| {
+        // ritratto grande con la sua cornicetta (il nearest-neighbor del
+        // plugin lo tiene pixelato)
+        vignetta
+            .spawn((
+                Node {
+                    padding: UiRect::all(Val::Px(8.0)),
+                    border: UiRect::all(Val::Px(2.0)),
+                    flex_shrink: 0.0,
+                    ..default()
+                },
+                BackgroundColor(NERO),
+                BorderColor::all(GRIGIO_SCAFO),
+            ))
+            .with_children(|c| {
+                c.spawn((
+                    ImageNode::new(art.ritratti[personaggio.ritratto].clone()),
+                    Node {
+                        width: Val::Px(144.0),
+                        height: Val::Px(144.0),
+                        ..default()
+                    },
+                ));
+            });
+        // colonna: nome/ruolo in alto, balloon sotto
+        vignetta
+            .spawn(Node {
+                flex_direction: FlexDirection::Column,
+                row_gap: Val::Px(12.0),
+                max_width: Val::Px(430.0),
                 ..default()
-            },
-            BackgroundColor(BIANCO),
-        ));
-    }
-    // ritratto grande (il nearest-neighbor del plugin lo tiene pixelato)
-    r.spawn((
-        ImageNode::new(art.ritratti[personaggio.ritratto].clone()),
-        Node {
-            width: Val::Px(160.0),
-            height: Val::Px(160.0),
-            margin: UiRect::top(Val::Px(10.0)),
-            ..default()
-        },
-    ));
-    r.spawn(testo(
-        format!("{} — {}", personaggio.nome, personaggio.ruolo),
-        15.0,
-        CIANO,
-    ));
+            })
+            .with_children(|col| {
+                col.spawn(testo(personaggio.nome, 22.0, CIANO));
+                col.spawn(testo(personaggio.ruolo, 14.0, GRIGIO_MEDIO));
+                // il balloon di carta, con la coda a gradini che sborda
+                // verso il ritratto
+                col.spawn(Node {
+                    flex_direction: FlexDirection::Row,
+                    align_items: AlignItems::Center,
+                    margin: UiRect::top(Val::Px(6.0)),
+                    ..default()
+                })
+                .with_children(|riga| {
+                    // coda: tre barre verticali a scalare, punta a sinistra
+                    riga.spawn(Node {
+                        flex_direction: FlexDirection::Row,
+                        align_items: AlignItems::Center,
+                        flex_shrink: 0.0,
+                        ..default()
+                    })
+                    .with_children(|coda| {
+                        for altezza in [10.0, 18.0, 28.0] {
+                            coda.spawn((
+                                Node {
+                                    width: Val::Px(6.0),
+                                    height: Val::Px(altezza),
+                                    ..default()
+                                },
+                                BackgroundColor(BIANCO),
+                            ));
+                        }
+                    });
+                    riga.spawn((
+                        Node {
+                            padding: UiRect::axes(Val::Px(20.0), Val::Px(16.0)),
+                            border_radius: BorderRadius::all(Val::Px(14.0)),
+                            ..default()
+                        },
+                        BackgroundColor(BIANCO),
+                    ))
+                    .with_children(|balloon| {
+                        balloon.spawn(testo(format!("\u{201C}{battuta}\u{201D}"), 16.0, NERO));
+                    });
+                });
+            });
+    });
     r.spawn(Node {
-        height: Val::Px(18.0),
+        height: Val::Px(22.0),
         ..default()
     });
     bottone(r, Azione::Avanti, "Avanti →", BIANCO, 17.0);
 }
 
-/// Pagina 1: l'obiettivo nero su bianco (anzi: giallo su nero) e la scelta
-/// fra ripensarci e giocare.
-fn pagina_obiettivo(r: &mut ChildSpawnerCommands, livello: &LivelloDef, indice: Option<usize>) {
+/// Pagina 1: il libretto del livello — nome, briefing, obiettivo, numeri,
+/// medaglia in bacheca coi tempi da battere, e "Gioca!". Ha ereditato
+/// tutto ciò che mostrava la vecchia schermata di briefing.
+fn pagina_obiettivo(
+    r: &mut ChildSpawnerCommands,
+    livello: &LivelloDef,
+    indice: Option<usize>,
+    con_fumetto: bool,
+    portafoglio: &Portafoglio,
+) {
     let eyebrow = match indice {
         Some(i) => format!("LIVELLO {}", i + 1),
         None => "LIVELLO CASUALE".to_string(),
     };
     r.spawn(testo(eyebrow, 14.0, GRIGIO_MEDIO));
+    r.spawn(testo(livello.nome.clone(), 30.0, BIANCO));
     r.spawn((Node {
-        margin: UiRect::bottom(Val::Px(14.0)),
+        max_width: Val::Px(560.0),
+        margin: UiRect::bottom(Val::Px(12.0)),
         ..default()
     },))
     .with_children(|c| {
-        c.spawn(testo(livello.nome.clone(), 30.0, BIANCO));
+        c.spawn(testo(livello.briefing.clone(), 15.0, METALLO));
     });
     r.spawn((Node {
         max_width: Val::Px(560.0),
@@ -284,6 +373,38 @@ fn pagina_obiettivo(r: &mut ChildSpawnerCommands, livello: &LivelloDef, indice: 
             METALLO,
         ));
     }
+    // la medaglia già in bacheca e cosa serve per migliorarla: è
+    // l'informazione di chi sta decidendo come giocarsela (solo campagna)
+    if let Some(i) = indice {
+        let medaglia = portafoglio.medaglia(i);
+        if medaglia > 0 {
+            let (nome, colore) = match medaglia {
+                ORO => ("ORO", GIALLO),
+                ARGENTO => ("ARGENTO", BIANCO),
+                _ => ("RAME", RUGGINE),
+            };
+            let mut riga = format!("Medaglia attuale: {nome}");
+            if medaglia < ORO {
+                riga.push_str(&format!(
+                    "  ·  oro entro {}",
+                    tick_in_tempo(soglia_massima(ORO, TICK_MASSIMO))
+                ));
+                if medaglia < ARGENTO {
+                    riga.push_str(&format!(
+                        ", argento entro {}",
+                        tick_in_tempo(soglia_massima(ARGENTO, TICK_MASSIMO))
+                    ));
+                }
+            }
+            r.spawn((Node {
+                margin: UiRect::top(Val::Px(6.0)),
+                ..default()
+            },))
+            .with_children(|c| {
+                c.spawn(testo(riga, 13.0, colore));
+            });
+        }
+    }
     r.spawn(Node {
         height: Val::Px(18.0),
         ..default()
@@ -294,17 +415,21 @@ fn pagina_obiettivo(r: &mut ChildSpawnerCommands, livello: &LivelloDef, indice: 
         ..default()
     })
     .with_children(|riga| {
-        bottone(riga, Azione::Indietro, "← Indietro", METALLO, 16.0);
+        // si torna alla vignetta solo se la vignetta esiste (prima visita)
+        if con_fumetto {
+            bottone(riga, Azione::Indietro, "← Indietro", METALLO, 16.0);
+        }
         bottone(riga, Azione::Gioca, "Gioca!", VERDE, 20.0);
     });
 }
 
 /// Click, hover e tastiera dei pulsanti. Invio/Spazio avanzano (e dalla
-/// pagina obiettivo giocano), Backspace/freccia sinistra tornano al
-/// personaggio; Esc non si gestisce qui (apre la pausa sopra, voluto).
-/// Il suono del click lo dà già il sistema globale (`audio::suona_click`);
-/// gli input di costruzione sono spenti finché il prologo è aperto, quindi
-/// lo Spazio non avvia anche la simulazione sotto.
+/// pagina obiettivo giocano), Backspace/freccia sinistra tornano alla
+/// vignetta — solo quando la vignetta esiste (prima visita del livello);
+/// Esc non si gestisce qui (apre la pausa sopra, voluto). Il suono del
+/// click lo dà già il sistema globale (`audio::suona_click`); gli input di
+/// costruzione sono spenti finché il prologo è aperto, quindi lo Spazio
+/// non avvia anche la simulazione sotto.
 pub fn click(
     mut prologo: ResMut<Prologo>,
     tasti: Res<ButtonInput<KeyCode>>,
@@ -336,8 +461,9 @@ pub fn click(
         Some(_) => {
             if tasti.just_pressed(KeyCode::Enter) || tasti.just_pressed(KeyCode::Space) {
                 prologo.pagina = None;
-            } else if tasti.just_pressed(KeyCode::Backspace)
-                || tasti.just_pressed(KeyCode::ArrowLeft)
+            } else if prologo.con_fumetto
+                && (tasti.just_pressed(KeyCode::Backspace)
+                    || tasti.just_pressed(KeyCode::ArrowLeft))
             {
                 prologo.pagina = Some(0);
             }

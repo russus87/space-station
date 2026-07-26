@@ -8,6 +8,7 @@ mod audio;
 mod commenti;
 mod generatore;
 mod impostazioni;
+mod imprevisti;
 mod livelli;
 mod menu;
 mod mercato;
@@ -241,6 +242,9 @@ fn main() {
         .init_resource::<livelli::LivelloScelto>()
         .init_resource::<livelli::LivelloCasuale>()
         .init_resource::<mercato::Mercato>()
+        .init_resource::<ui::RegistroAperto>()
+        .init_resource::<imprevisti::Imprevisti>()
+        .init_resource::<musica::MusicaSospesa>()
         .init_resource::<musica::StatoMusica>()
         .init_resource::<livelli::UltimaMedaglia>()
         .init_resource::<prologo::Prologo>()
@@ -258,7 +262,15 @@ fn main() {
         .insert_resource(EventLog::default())
         .add_systems(
             Startup,
-            (font_principale, carica_art, audio::carica_suoni, (setup, ui::setup_ui)).chain(),
+            (
+                font_principale,
+                carica_art,
+                audio::carica_suoni,
+                imprevisti::carica_suoni,
+                imprevisti::carica_arte,
+                (setup, ui::setup_ui),
+            )
+                .chain(),
         )
         .add_systems(OnEnter(AppState::Marketplace), menu::entra_marketplace)
         .add_systems(OnExit(AppState::Marketplace), menu::esci_marketplace)
@@ -270,8 +282,6 @@ fn main() {
         .add_systems(OnExit(AppState::ComeSiGioca), menu::esci_guida)
         .add_systems(OnEnter(AppState::SelezioneLivello), menu::entra_selezione)
         .add_systems(OnExit(AppState::SelezioneLivello), menu::esci_selezione)
-        .add_systems(OnEnter(AppState::Briefing), menu::entra_briefing)
-        .add_systems(OnExit(AppState::Briefing), menu::esci_briefing)
         .add_systems(OnEnter(AppState::Intermezzo), menu::entra_intermezzo)
         .add_systems(OnExit(AppState::Intermezzo), menu::esci_intermezzo)
         .add_systems(OnEnter(AppState::SchermataClassifica), menu::entra_classifica)
@@ -307,10 +317,9 @@ fn main() {
                 prologo::click,
                 ui::click_palette,
                 ui::click_bottone_menu,
-                mercato::toggle_tasto.run_if(not(prologo::attivo)),
-                mercato::click_bottone.run_if(not(prologo::attivo)),
                 mercato::click_scorte,
                 sim::sim_tick.run_if(sim_attiva),
+                imprevisti::pianifica_e_applica,
                 applica_gru,
                 // in Infinita/Sfida il codice degli obiettivi non gira proprio
                 livelli::controlla_obiettivo.run_if(livelli::obiettivi_attivi),
@@ -328,8 +337,10 @@ fn main() {
                     aggiorna_ghost,
                     aggiorna_visuali,
                     orienta_corridoi,
-                    mercato::sincronizza,
                     prologo::sincronizza,
+                    ui::registro,
+                    ui::tooltip_scorte,
+                    imprevisti::anima,
                     commenti::rileva_eventi,
                     commenti::scadenza,
                     visibilita_scena,
@@ -341,6 +352,7 @@ fn main() {
                     audio::suona_click,
                     musica::gestisci_musica,
                     musica::applica_volume,
+                    musica::applica_sospensione,
                 ),
                 // etichette dinamiche, servizi e pannelli UI
                 (
@@ -1099,14 +1111,16 @@ fn demo_foto(
             prossimo.set(AppState::InGioco);
         }
         80 => {
-            // stazione d'esempio in equilibrio: un reattore regge tutto
+            // stazione d'esempio con la dorsale di corridoi: le foglie si
+            // allacciano solo ai conduttori (regola delle reti in sim.rs)
             let piano = [
                 (ModuleKind::Reattore, 5, 4),
-                (ModuleKind::LifeSupport, 6, 4),
-                (ModuleKind::Dormitorio, 7, 4),
-                (ModuleKind::Dormitorio, 8, 4),
-                (ModuleKind::Radiatore, 5, 3),
-                (ModuleKind::Corridoio, 6, 3),
+                (ModuleKind::Corridoio, 6, 4),
+                (ModuleKind::Corridoio, 7, 4),
+                (ModuleKind::LifeSupport, 5, 3),
+                (ModuleKind::Radiatore, 5, 5),
+                (ModuleKind::Dormitorio, 6, 3),
+                (ModuleKind::Dormitorio, 6, 5),
                 (ModuleKind::Laboratorio, 7, 3),
             ];
             for (kind, x, y) in piano {

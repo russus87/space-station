@@ -150,7 +150,8 @@ fn livelli_curati() -> Vec<LivelloDef> {
             briefing: "Un reattore, un life support, un dormitorio: attaccati tra loro.".into(),
             obiettivo: Obiettivo::Equipaggio { minimo: 4 },
             ostacoli: vec![],
-            // fabbisogno minimo 4 (reattore, life support, dormitorio, radiatore)
+            // fabbisogno minimo 4 (reattore, life support, dormitorio,
+            // radiatore): tre foglie sulle facce del reattore, zero corridoi
             max_moduli: 6,
         },
         LivelloDef {
@@ -159,8 +160,9 @@ fn livelli_curati() -> Vec<LivelloDef> {
             obiettivo: Obiettivo::Equipaggio { minimo: 8 },
             // muro verticale al centro, aggirabile in alto e in basso
             ostacoli: vec![(6, 2), (6, 3), (6, 4), (6, 5)],
-            // fabbisogno minimo 7, più i corridoi per aggirare il muro
-            max_moduli: 12,
+            // fabbisogno minimo 9 (con la regola dei conduttori i corridoi
+            // sono obbligatori: 2 nel conto), più il margine per il muro
+            max_moduli: 13,
         },
         LivelloDef {
             nome: "Sala macchine".into(),
@@ -170,7 +172,8 @@ fn livelli_curati() -> Vec<LivelloDef> {
                 tick: 15,
             },
             ostacoli: vec![],
-            // fabbisogno minimo 9 (2 reattori, life support, dormitorio, 2 lab, 3 radiatori)
+            // fabbisogno minimo 10 (2 reattori, life support, dormitorio,
+            // 2 lab, 3 radiatori, 1 corridoio)
             max_moduli: 13,
         },
         LivelloDef {
@@ -182,7 +185,7 @@ fn livelli_curati() -> Vec<LivelloDef> {
             },
             // detriti sparsi: spezzano i blocchi compatti, i radiatori vanno incastrati
             ostacoli: vec![(2, 5), (4, 1), (7, 4), (10, 6), (11, 2)],
-            // come Sala macchine, con un radiatore di margine per le avarie
+            // come Sala macchine (minimo 10), con margine per le avarie
             max_moduli: 14,
         },
         LivelloDef {
@@ -190,7 +193,8 @@ fn livelli_curati() -> Vec<LivelloDef> {
             briefing: "Il margine serve a questo: a non restare mai al buio.".into(),
             obiettivo: Obiettivo::PuntiSenzaBlackout { punti: 400 },
             ostacoli: vec![],
-            // stazione libera, ma il margine energetico va costruito con poco
+            // stazione libera (minimo 9 coi corridoi), ma il margine
+            // energetico va costruito con poco
             max_moduli: 15,
         },
         LivelloDef {
@@ -202,7 +206,8 @@ fn livelli_curati() -> Vec<LivelloDef> {
             },
             // fascia diagonale: la stazione grande va fatta serpeggiare
             ostacoli: vec![(4, 6), (5, 5), (6, 4), (7, 3), (8, 2), (9, 1)],
-            // fabbisogno minimo 11, più i corridoi per serpeggiare tra i detriti
+            // fabbisogno minimo 13 (2 corridoi nel conto), più il margine
+            // per serpeggiare tra i detriti
             max_moduli: 18,
         },
     ]

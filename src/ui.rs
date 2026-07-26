@@ -40,15 +40,42 @@ pub struct RadiceGioco;
 #[derive(Component)]
 pub struct BottoneMenu;
 
-/// Il tasto SCORTE nell'HUD: apre l'inventario delle scorte, come M
-/// (vedi mercato.rs; si comprano nel Marketplace dal titolo).
-#[derive(Component)]
-pub struct BottoneMercato;
-
-/// La fila di iconcine delle scorte possedute, accanto al bottone SCORTE:
-/// a colpo d'occhio cosa hai in magazzino (M apre l'inventario).
+/// La fila delle scorte possedute, nella colonna sinistra sopra il
+/// pannello ispezione: icone sempre visibili, tooltip al passaggio,
+/// click per usarle (il consumo vive in mercato.rs).
 #[derive(Component)]
 pub struct ScorteHud;
+
+/// Un'icona-scorta cliccabile; il valore è l'indice nel catalogo
+/// `mercato::FACILITIES`. La legge `mercato::click_scorte`.
+#[derive(Component)]
+pub struct IconaScorta(pub usize);
+
+/// Il pannellino-tooltip figlio di un'icona scorta (Display toggled).
+#[derive(Component)]
+pub struct TooltipScorta;
+
+/// La riga di stato dinamica dentro il tooltip ("cliccala per usarla" o
+/// il motivo per cui qui non serve); il valore è l'indice di catalogo.
+#[derive(Component)]
+pub struct StatoTooltip(pub usize);
+
+/// Lo stato del pannello Registro (log eventi): parte chiuso, si apre col
+/// bottone in basso. Registrare con `init_resource` in main.
+#[derive(Resource, Default)]
+pub struct RegistroAperto(pub bool);
+
+/// Il bottone che apre/chiude il Registro.
+#[derive(Component)]
+pub struct BottoneRegistro;
+
+/// Il contenitore delle righe di log (Display toggled col Registro).
+#[derive(Component)]
+pub struct PannelloRighe;
+
+/// La nota per nerd nell'intestazione del Registro (visibile da aperto).
+#[derive(Component)]
+pub struct NotaRegistro;
 
 #[derive(Component, Clone, Copy)]
 pub enum CampoHud {
@@ -169,7 +196,9 @@ fn pannello_risorsa(
     });
 }
 
-pub fn setup_ui(mut commands: Commands, art: Res<Art>) {
+pub fn setup_ui(mut commands: Commands, art: Res<Art>, assets: Res<AssetServer>) {
+    // l'icona del Registro non passa da `Art`: serve solo qui
+    let icona_registro = assets.load("sprites/registro.png");
     commands
         .spawn((
             Node {
@@ -263,30 +292,6 @@ pub fn setup_ui(mut commands: Commands, art: Res<Art>) {
                 .with_children(|c| {
                     c.spawn((testo("", 13.0, GRIGIO_MEDIO), CampoHud::Punteggio));
                 });
-                hud.spawn((
-                    Node {
-                        flex_direction: FlexDirection::Row,
-                        align_items: AlignItems::Center,
-                        column_gap: Val::Px(4.0),
-                        margin: UiRect::right(Val::Px(8.0)),
-                        ..default()
-                    },
-                    ScorteHud,
-                ));
-                hud.spawn((
-                    Node {
-                        padding: UiRect::axes(Val::Px(12.0), Val::Px(5.0)),
-                        margin: UiRect::right(Val::Px(6.0)),
-                        border: UiRect::all(Val::Px(1.0)),
-                        ..default()
-                    },
-                    BorderColor::all(GRIGIO_SCAFO),
-                    Button,
-                    BottoneMercato,
-                ))
-                .with_children(|c| {
-                    c.spawn(testo("SCORTE m", 13.0, METALLO));
-                });
                 // uscita sempre visibile: il menu esisteva solo dietro Esc e
                 // al playtest nessuno l'ha trovato — un tasto a schermo è
                 // l'unica affordance che non richiede di conoscere il comando
@@ -333,10 +338,26 @@ pub fn setup_ui(mut commands: Commands, art: Res<Art>) {
                         for (i, kind) in KINDS.iter().enumerate() {
                             slot_palette(col, &art, i, *kind);
                         }
-                        // il pannello ispezione occupa il fondo della colonna
+                        // le scorte possedute, appena sopra l'ispezione:
+                        // icone con tooltip, click per usarle
                         col.spawn((
                             Node {
                                 margin: UiRect::top(Val::Auto),
+                                flex_direction: FlexDirection::Row,
+                                flex_wrap: FlexWrap::Wrap,
+                                align_items: AlignItems::Center,
+                                column_gap: Val::Px(6.0),
+                                row_gap: Val::Px(4.0),
+                                padding: UiRect::axes(Val::Px(4.0), Val::Px(4.0)),
+                                ..default()
+                            },
+                            ScorteHud,
+                        ));
+                        // il pannello ispezione chiude la colonna, sotto le
+                        // scorte (è la fila scorte a spingere tutto in fondo
+                        // col margin-top auto)
+                        col.spawn((
+                            Node {
                                 flex_direction: FlexDirection::Column,
                                 padding: UiRect::all(Val::Px(8.0)),
                                 row_gap: Val::Px(4.0),
@@ -377,22 +398,80 @@ pub fn setup_ui(mut commands: Commands, art: Res<Art>) {
                 },));
             });
 
-            // ---------- log eventi (barra inferiore) ----------
+            // ---------- Registro (barra inferiore, parte chiuso) ----------
+            // il pannello tiene sempre la sua altezza (layout stabile): da
+            // chiuso è solo scuro con la barretta-bottone in alto
             root.spawn((
                 Node {
                     width: Val::Percent(100.0),
                     height: Val::Percent(18.0),
                     min_height: Val::Px(150.0),
                     flex_direction: FlexDirection::Column,
-                    padding: UiRect::axes(Val::Px(14.0), Val::Px(6.0)),
+                    padding: UiRect::axes(Val::Px(14.0), Val::Px(4.0)),
                     ..default()
                 },
                 BackgroundColor(SCAFO_SCURO),
             ))
             .with_children(|log| {
-                for i in 0..LOG_RIGHE {
-                    log.spawn((testo("", 13.0, METALLO), RigaLog(i)));
-                }
+                // intestazione: bottone icona+Registro, e la nota per nerd
+                log.spawn(Node {
+                    flex_direction: FlexDirection::Row,
+                    align_items: AlignItems::Center,
+                    column_gap: Val::Px(10.0),
+                    ..default()
+                })
+                .with_children(|testata| {
+                    testata
+                        .spawn((
+                            Node {
+                                flex_direction: FlexDirection::Row,
+                                align_items: AlignItems::Center,
+                                column_gap: Val::Px(6.0),
+                                padding: UiRect::axes(Val::Px(8.0), Val::Px(3.0)),
+                                border: UiRect::all(Val::Px(1.0)),
+                                ..default()
+                            },
+                            BorderColor::all(GRIGIO_SCAFO),
+                            Button,
+                            BottoneRegistro,
+                        ))
+                        .with_children(|b| {
+                            b.spawn((
+                                ImageNode::new(icona_registro),
+                                Node {
+                                    width: Val::Px(16.0),
+                                    height: Val::Px(16.0),
+                                    ..default()
+                                },
+                            ));
+                            b.spawn(testo("Registro", 13.0, METALLO));
+                        });
+                    testata.spawn((
+                        testo(
+                            "tail -f /var/log/stazione.log — il grep è compreso nel prezzo",
+                            11.0,
+                            GRIGIO_MEDIO,
+                        ),
+                        Node {
+                            display: Display::None, // compare col Registro aperto
+                            ..default()
+                        },
+                        NotaRegistro,
+                    ));
+                });
+                log.spawn((
+                    Node {
+                        flex_direction: FlexDirection::Column,
+                        display: Display::None, // il Registro parte chiuso
+                        ..default()
+                    },
+                    PannelloRighe,
+                ))
+                .with_children(|righe| {
+                    for i in 0..LOG_RIGHE {
+                        righe.spawn((testo("", 13.0, METALLO), RigaLog(i)));
+                    }
+                });
             });
         });
 }
@@ -624,14 +703,9 @@ pub fn update_hud(
                 c.0 = GRIGIO_MEDIO;
             }
             CampoHud::EquipaggioTotale => {
-                t.0 = if sim.lab_fabbisogno > 0 {
-                    format!(
-                        "{}/{}  lab servono {}",
-                        sim.equipaggio, sim.posti_letto, sim.lab_fabbisogno
-                    )
-                } else {
-                    format!("{}/{}", sim.equipaggio, sim.posti_letto)
-                };
+                // niente suggerimenti sul fabbisogno dei laboratori: capire
+                // quanta gente serve è parte del gioco (richiesta playtest)
+                t.0 = format!("{}/{}", sim.equipaggio, sim.posti_letto);
                 c.0 = col_crew;
             }
             CampoHud::Obiettivo => {
@@ -719,20 +793,52 @@ pub fn click_palette(
     }
 }
 
-/// Ricostruisce la fila di iconcine delle scorte quando l'inventario
-/// cambia: una per tipo posseduto, con "×N" oltre la prima. A magazzino
-/// vuoto la fila è semplicemente vuota (zero figli, zero ingombro).
+/// Apre e chiude il Registro: click sul bottone, Display sulle righe e
+/// sulla nota per nerd. Tutto in un sistema, stato nella risorsa.
+pub fn registro(
+    mut aperto: ResMut<RegistroAperto>,
+    click: Query<&Interaction, (Changed<Interaction>, With<BottoneRegistro>)>,
+    mut righe: Query<&mut Node, (With<PannelloRighe>, Without<NotaRegistro>)>,
+    mut nota: Query<&mut Node, (With<NotaRegistro>, Without<PannelloRighe>)>,
+) {
+    if click.iter().any(|i| *i == Interaction::Pressed) {
+        aperto.0 = !aperto.0;
+    }
+    if !aperto.is_changed() {
+        return;
+    }
+    let display = if aperto.0 { Display::Flex } else { Display::None };
+    for mut n in &mut righe {
+        n.display = display;
+    }
+    for mut n in &mut nota {
+        n.display = display;
+    }
+}
+
+/// Ricostruisce la fila delle scorte (colonna sinistra) quando cambia
+/// l'inventario O l'applicabilità: ogni tipo posseduto è un bottone-icona
+/// col suo tooltip; le scorte che ADESSO non servono sono smorzate, mute
+/// e inerti. A magazzino vuoto la fila è vuota (zero ingombro).
 pub fn update_scorte_hud(
     mut commands: Commands,
     portafoglio: Res<crate::progressi::Portafoglio>,
+    station: Res<crate::Station>,
+    sim: Res<Sim>,
+    moduli: Query<&Module>,
     art: Res<Art>,
     q: Query<Entity, With<ScorteHud>>,
+    mut usabili_prima: Local<Vec<bool>>,
     mut primo: Local<bool>,
 ) {
-    if *primo && !portafoglio.is_changed() {
+    let avarie = moduli.iter().filter(|m| m.broken).count();
+    let usabili = crate::mercato::applicabilita(&station, &sim, avarie);
+    let cambiate = usabili != *usabili_prima;
+    if *primo && !portafoglio.is_changed() && !cambiate {
         return;
     }
     *primo = true;
+    *usabili_prima = usabili.clone();
     let Ok(fila) = q.single() else {
         return;
     };
@@ -742,19 +848,97 @@ pub fn update_scorte_hud(
         .despawn_children()
         .with_children(|p| {
             for (idx, quante) in scorte {
-                p.spawn((
-                    ImageNode::new(art.facilities[idx].clone()),
+                let f = &crate::mercato::FACILITIES[idx];
+                let attiva = usabili.get(idx).copied().unwrap_or(false);
+                let mut bottone = p.spawn((
                     Node {
-                        width: Val::Px(20.0),
-                        height: Val::Px(20.0),
+                        flex_direction: FlexDirection::Row,
+                        align_items: AlignItems::Center,
+                        column_gap: Val::Px(2.0),
+                        padding: UiRect::all(Val::Px(2.0)),
                         ..default()
                     },
+                    Button,
+                    IconaScorta(idx),
                 ));
-                if quante > 1 {
-                    p.spawn(testo(format!("×{quante}"), 11.0, GRIGIO_MEDIO));
+                if !attiva {
+                    bottone.insert(crate::audio::BottoneMuto);
                 }
+                bottone.with_children(|b| {
+                    b.spawn((
+                        ImageNode {
+                            image: art.facilities[idx].clone(),
+                            color: if attiva { Color::WHITE } else { GRIGIO_MEDIO },
+                            ..default()
+                        },
+                        Node {
+                            width: Val::Px(24.0),
+                            height: Val::Px(24.0),
+                            ..default()
+                        },
+                    ));
+                    if quante > 1 {
+                        b.spawn(testo(format!("×{quante}"), 11.0, GRIGIO_MEDIO));
+                    }
+                    // tooltip: nome, descrizione e stato, ancorato sopra
+                    b.spawn((
+                        Node {
+                            position_type: PositionType::Absolute,
+                            left: Val::Px(0.0),
+                            bottom: Val::Px(30.0),
+                            width: Val::Px(220.0),
+                            flex_direction: FlexDirection::Column,
+                            row_gap: Val::Px(2.0),
+                            padding: UiRect::all(Val::Px(8.0)),
+                            border: UiRect::all(Val::Px(1.0)),
+                            display: Display::None,
+                            ..default()
+                        },
+                        BackgroundColor(SCAFO_SCURO),
+                        BorderColor::all(GRIGIO_SCAFO),
+                        TooltipScorta,
+                    ))
+                    .with_children(|tip| {
+                        tip.spawn(testo(f.nome, 12.0, BIANCO));
+                        tip.spawn(testo(f.descrizione, 11.0, GRIGIO_MEDIO));
+                        tip.spawn((testo("", 11.0, CIANO), StatoTooltip(idx)));
+                    });
+                });
             }
         });
+}
+
+/// Mostra il tooltip della scorta sotto il cursore e ne aggiorna la riga
+/// di stato ("cliccala per usarla" o il motivo per cui qui non serve).
+pub fn tooltip_scorte(
+    icone: Query<(&Interaction, &IconaScorta, &Children)>,
+    mut tooltip: Query<&mut Node, With<TooltipScorta>>,
+    mut stati: Query<(&StatoTooltip, &mut Text, &mut TextColor)>,
+    station: Res<crate::Station>,
+    sim: Res<Sim>,
+    moduli: Query<&Module>,
+) {
+    let avarie = moduli.iter().filter(|m| m.broken).count();
+    for (stato, mut t, mut c) in &mut stati {
+        match crate::mercato::motivo_non_applicabile(stato.0, &station, &sim, avarie) {
+            Some(motivo) => {
+                t.0 = format!("qui non serve: {motivo}");
+                c.0 = GRIGIO_MEDIO;
+            }
+            None => {
+                t.0 = "cliccala per usarla".into();
+                c.0 = CIANO;
+            }
+        }
+    }
+    for (interazione, _, figli) in &icone {
+        let sopra = matches!(interazione, Interaction::Hovered | Interaction::Pressed);
+        for figlio in figli.iter() {
+            if let Ok(mut n) = tooltip.get_mut(figlio) {
+                n.display = if sopra { Display::Flex } else { Display::None };
+            }
+        }
+    }
 }
 
 /// Il tasto MENU dell'HUD apre l'overlay di pausa, identico a Esc.

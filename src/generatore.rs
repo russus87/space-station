@@ -32,6 +32,7 @@ const LAB_ENERGIA: u32 = 40;
 const LAB_CALORE: u32 = 25;
 const RAD_ENERGIA: u32 = 5;
 const RAD_CALORE: u32 = 50;
+const CORRIDOIO_ENERGIA: u32 = 1;
 const O2_PER_CREW: u32 = 10;
 
 // ---------------- PRNG ----------------
@@ -61,9 +62,15 @@ impl Rng {
 // ---------------- fabbisogno minimo ----------------
 
 /// Quanti moduli servono, come minimo, per l'obiettivo: la soluzione ovvia
-/// (reattori + life support + dormitori + eventuali laboratori + radiatori),
-/// senza corridoi. Usata dal generatore per il budget E dai test per la
-/// garanzia di risolvibilità: una definizione sola, non possono divergere.
+/// (reattori + life support + dormitori + eventuali laboratori +
+/// radiatori) PIÙ i corridoi imposti dalla regola dei conduttori (sim.rs,
+/// fase 2: le foglie si allacciano solo a reattori e corridoi, non si
+/// prolungano a vicenda). Modello prudente e documentato: ogni reattore
+/// allaccia 3 foglie (la quarta faccia resta per la dorsale), ogni
+/// corridoio in linea ne allaccia 2 nette; `corridoi =
+/// ceil((foglie − 3·reattori) / 2)`, e i corridoi consumano energia.
+/// Usata dal generatore per il budget E dai test per la garanzia di
+/// risolvibilità: una definizione sola, non possono divergere.
 pub fn fabbisogno_minimo(ob: &Obiettivo) -> u32 {
     let (equipaggio, laboratori) = match *ob {
         Obiettivo::Equipaggio { minimo } => (minimo, 0),
@@ -75,26 +82,32 @@ pub fn fabbisogno_minimo(ob: &Obiettivo) -> u32 {
     };
     let dormitori = equipaggio.div_ceil(DORM_POSTI).max(1);
     let life_support = (equipaggio * O2_PER_CREW).div_ceil(LS_OSSIGENO).max(1);
-    // radiatori e reattori si condizionano a vicenda (i radiatori consumano
-    // energia, i reattori scaldano): punto fisso, converge in pochi giri
+    // radiatori, corridoi e reattori si condizionano a vicenda (radiatori
+    // e corridoi consumano energia, i reattori scaldano e allacciano
+    // foglie): punto fisso monotono, converge in pochi giri
     let mut radiatori = 0u32;
+    let mut corridoi = 0u32;
     let reattori = loop {
         let consumo = LS_ENERGIA * life_support
             + DORM_ENERGIA * dormitori
             + LAB_ENERGIA * laboratori
-            + RAD_ENERGIA * radiatori;
+            + RAD_ENERGIA * radiatori
+            + CORRIDOIO_ENERGIA * corridoi;
         let reattori = consumo.div_ceil(REATTORE_ENERGIA).max(1);
         let calore = REATTORE_CALORE * reattori
             + LS_CALORE * life_support
             + DORM_CALORE * dormitori
             + LAB_CALORE * laboratori;
-        let servono = calore.div_ceil(RAD_CALORE);
-        if servono <= radiatori {
+        let rad_servono = calore.div_ceil(RAD_CALORE);
+        let foglie = life_support + dormitori + laboratori + radiatori.max(rad_servono);
+        let corr_servono = foglie.saturating_sub(3 * reattori).div_ceil(2);
+        if rad_servono <= radiatori && corr_servono <= corridoi {
             break reattori;
         }
-        radiatori = servono;
+        radiatori = radiatori.max(rad_servono);
+        corridoi = corridoi.max(corr_servono);
     };
-    reattori + life_support + dormitori + laboratori + radiatori
+    reattori + life_support + dormitori + laboratori + radiatori + corridoi
 }
 
 // ---------------- generazione ----------------
@@ -114,7 +127,32 @@ pub fn genera_casuale(seed: u64) -> LivelloDef {
 
 fn genera(n: usize, mut rng: Rng, casuale: bool) -> LivelloDef {
     let n32 = n as u32;
-    let obiettivo = match rng.range(0, 5) {
+    // Obiettivi PESATI per blocco (SPEC-CAMPAGNA §1: i livelli dopo uno
+    // sblocco valorizzano il modulo appena consegnato). Pesi sull'ordine
+    // [Equipaggio, LabConsecutivi, SopravviviConLab, Punti, Colonia]:
+    //   7–15  Batteria appena presa → Punti-senza-blackout pesa doppio
+    //         (la batteria è l'assicurazione contro l'azzeramento);
+    //  16–25  Serra → equipaggi grandi (Equipaggio e Colonia rendono
+    //         l'ossigeno-per-watt il collo di bottiglia);
+    //  26–35  Gru → pesi piatti ma quota detriti +2 (sotto);
+    //  36–50  Centro comando → Colonia più che può.
+    let pesi: [u32; 5] = match n {
+        0..=15 => [2, 2, 2, 4, 2],
+        16..=25 => [4, 2, 2, 2, 3],
+        26..=35 => [2, 2, 2, 2, 2],
+        _ => [2, 2, 2, 2, 5],
+    };
+    let totale: i32 = pesi.iter().sum::<u32>() as i32;
+    let mut estratto = rng.range(0, totale) as u32;
+    let mut tipo = 4;
+    for (i, p) in pesi.iter().enumerate() {
+        if estratto < *p {
+            tipo = i;
+            break;
+        }
+        estratto -= p;
+    }
+    let obiettivo = match tipo {
         0 => Obiettivo::Equipaggio {
             minimo: (6 + n32 / 4).min(20),
         },
@@ -140,8 +178,14 @@ fn genera(n: usize, mut rng: Rng, casuale: bool) -> LivelloDef {
     let margine = 1.6 - (n.clamp(7, 50) - 7) as f32 * (0.45 / 43.0);
     let max_moduli = ((minimo as f32 * margine).ceil() as u32).max(minimo + 2);
 
-    // detriti: quota crescente, pattern dal seed, con garanzia di area
-    let quota = (((n - 6) * 12) / 44).clamp(2, 12);
+    // detriti: quota crescente, pattern dal seed, con garanzia di area;
+    // nel blocco della Gru (26-35) due detriti in più: sono il suo mestiere
+    let quota_base = (((n - 6) * 12) / 44).clamp(2, 12);
+    let quota = if (26..=35).contains(&n) {
+        (quota_base + 2).min(12)
+    } else {
+        quota_base
+    };
     let mut ostacoli = Vec::new();
     for tentativo in 0..20 {
         let candidati = if tentativo < 19 {
@@ -330,6 +374,8 @@ mod test {
         let d = ModuleKind::Radiatore.def();
         assert_eq!(-d.energia as u32, RAD_ENERGIA);
         assert_eq!(-d.calore as u32, RAD_CALORE);
+        let d = ModuleKind::Corridoio.def();
+        assert_eq!(-d.energia as u32, CORRIDOIO_ENERGIA);
         assert_eq!(crate::sim::OSSIGENO_PER_CREW as u32, O2_PER_CREW);
     }
 
@@ -371,6 +417,59 @@ mod test {
             let l = genera_casuale(seed.wrapping_mul(0x9E37_79B9));
             assert!(l.max_moduli >= fabbisogno_minimo(&l.obiettivo));
             assert!(area_libera_connessa(&l.ostacoli) >= l.max_moduli);
+        }
+    }
+
+    /// Stima PRUDENTE dei tick minimi per completare un obiettivo, usata
+    /// solo dal test dell'oro. Assunzioni documentate:
+    /// - gli arrivi vanno a 1 ogni `TICK_ARRIVO` (4) tick, da zero, senza
+    ///   Centro comando;
+    /// - i laboratori impegnano 2 persone l'uno, che devono prima arrivare;
+    /// - PuntiSenzaBlackout: equipaggio plausibile a regime 12 (tre
+    ///   dormitori stanno in ogni budget); la rampa (equipaggio che sale
+    ///   di 1 ogni 4 tick fino a 12) dura 48 tick e vale 4·(1+…+12) = 312
+    ///   punti, il resto arriva a 12 punti/tick.
+    fn tempo_intrinseco(ob: &Obiettivo) -> u64 {
+        let cadenza = crate::sim::TICK_ARRIVO as u64;
+        match *ob {
+            Obiettivo::Equipaggio { minimo } => minimo as u64 * cadenza,
+            Obiettivo::LabConsecutivi { laboratori, tick } => {
+                2 * laboratori as u64 * cadenza + tick as u64
+            }
+            Obiettivo::SopravviviConLab { laboratori, tick } => {
+                2 * laboratori as u64 * cadenza + tick as u64
+            }
+            Obiettivo::PuntiSenzaBlackout { punti } => {
+                const RAMPA_TICK: u64 = 48;
+                const RAMPA_PUNTI: u64 = 312;
+                if punti <= RAMPA_PUNTI {
+                    RAMPA_TICK
+                } else {
+                    RAMPA_TICK + (punti - RAMPA_PUNTI).div_ceil(12)
+                }
+            }
+            Obiettivo::Colonia { equipaggio, tick } => (equipaggio as u64 * cadenza).max(tick),
+        }
+    }
+
+    #[test]
+    fn l_oro_e_matematicamente_possibile_su_ogni_livello() {
+        use crate::progressi::{ORO, medaglia_per_tempo};
+        use crate::sim::TICK_MASSIMO;
+        for (i, l) in LIVELLI.iter().enumerate() {
+            let t = tempo_intrinseco(&l.obiettivo);
+            assert_eq!(
+                medaglia_per_tempo(t, TICK_MASSIMO),
+                ORO,
+                "livello {}: tempo intrinseco {} sopra la soglia oro",
+                i + 1,
+                t
+            );
+        }
+        for seed in 0..200u64 {
+            let l = genera_casuale(seed.wrapping_mul(0x9E37_79B9));
+            let t = tempo_intrinseco(&l.obiettivo);
+            assert_eq!(medaglia_per_tempo(t, TICK_MASSIMO), ORO);
         }
     }
 }

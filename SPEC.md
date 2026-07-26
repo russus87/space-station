@@ -28,6 +28,17 @@ Il log eventi funziona e resta, concettualmente invariato.
 > (`commenti.rs`); cursore pixel-art con mirino in griglia. Il quadro
 > giocatore completo è in `MANUALE.md`; ciò che resta proposto è
 > nell'header di `SPEC-CAMPAGNA.md`.
+>
+> **Iterazione 6 (implementata)**: **regola dei conduttori** (§12.1:
+> l'energia viaggia solo lungo reattori e corridoi, gli altri moduli sono
+> foglie — fabbisogni, budget e livelli 7-50 rigenerati di conseguenza);
+> **imprevisti casuali** (`imprevisti.rs`: meteorite, tempesta EM, sciame
+> sui corridoi, passaggio del pianeta; preavviso di 4 tick con sirena
+> animata e musica sospesa, grazia al tick 40, cooldown 50, campagna dal
+> livello 8); medaglie ritarate (oro ≤35%, argento ≤60%); Batteria
+> (capienza 250, ricarica 25, calore +1) e Serra (−8/+25/+6) ribilanciate
+> con obiettivi pesati per blocco; Registro collassabile, scorte a icone
+> con tooltip (via il tasto M), briefing sostituito dal prologo.
 
 ---
 
@@ -455,14 +466,20 @@ sez. 10 — **cambiano la simulazione**, e sono lo stato implementato in
 
 ### 12.1 Reti elettriche (adiacenza)
 
-- Due moduli sono **collegati** se le loro celle sono ortogonalmente
-  adiacenti (4 vicini, niente diagonali). Ogni gruppo di moduli collegati è
-  una **rete** (componente connessa, calcolata a ogni tick).
+- **Regola dei conduttori** (iterazione 6): l'energia si propaga solo
+  attraverso i CONDUTTORI — **Reattore e Corridoio**. Gli altri moduli
+  sono FOGLIE: appartengono a una rete se ortogonalmente adiacenti (4
+  vicini, niente diagonali) ad almeno un suo conduttore, ma **non
+  prolungano** la corrente: una fila di dormitori non è un cavo. La rete è
+  la componente connessa dei conduttori (BFS seminata dai conduttori) più
+  le foglie annesse; una foglia che tocca due reti finisce nella prima in
+  ordine deterministico `(priorita, seq)`; le foglie senza conduttori sono
+  isole scollegate.
 - Una rete alimenta i suoi moduli **solo se contiene almeno un reattore non
   in avaria**. L'energia non passa da una rete all'altra.
-- I moduli in avaria **conducono comunque** corrente: sono ancora tubi, non
-  buchi. Un reattore in avaria conduce ma non produce e non "accende" la
-  sua rete.
+- I conduttori in avaria **conducono comunque** corrente: sono ancora tubi,
+  non buchi. Un reattore in avaria conduce ma non produce e non "accende"
+  la sua rete.
 - Dentro ogni rete l'allocazione è quella di sempre: prima si sommano
   **tutti** i produttori della rete, poi si distribuisce ai consumatori in
   ordine `(priorita, seq)`. Il pre-passaggio dei produttori è la correzione
@@ -481,8 +498,10 @@ sez. 10 — **cambiano la simulazione**, e sono lo stato implementato in
   loro problema dichiarato è l'avaria.
 - **Ossigeno, calore ed equipaggio restano a livello di stazione**: la
   stazione è una sola, l'adiacenza governa solo l'energia.
-- Il Corridoio (−1 energia, nessun'altra funzione) è il connettore
-  economico. I suoi numeri non sono cambiati.
+- Il Corridoio (−1 energia) non è più opzionale: è metà della regola dei
+  conduttori — la dorsale di ogni stazione. I suoi numeri non sono
+  cambiati; il suo peso strategico sì (e `fabbisogno_minimo` nel
+  generatore ora conta anche i corridoi obbligati).
 
 ### 12.2 Punteggio e fine partita
 

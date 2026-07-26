@@ -397,7 +397,7 @@ hr.torn{
 
 <!-- ============ COVER ============ -->
 <header class="cover">
-  <div class="kicker">manuale operativo di bordo — edizione v0.6</div>
+  <div class="kicker">manuale operativo di bordo — edizione v0.7</div>
   <h1 class="zine-title">
     <span class="blob" style="background:var(--orange); width:260px;height:150px; left:-30px; top:-10px;"></span>
     <span class="blob" style="background:var(--cyan); width:180px;height:120px; right:-20px; bottom:-20px;"></span>
@@ -484,13 +484,18 @@ hr.torn{
       </div>
 
       <p><b>La regola d'oro dell'energia:</b> la corrente non salta il
-      vuoto. Ogni gruppo di moduli ortogonalmente adiacenti è una
+      vuoto, e non la porta chiunque. Solo <b>reattori e corridoi
+      conducono</b>: sono le celle ortogonalmente adiacenti tra loro a fare
       <b>rete</b>, e una rete senza reattore funzionante è ferraglia
-      fredda. I corridoi esistono per questo: un filo di corrente da 1 di
-      energia a cella.</p>
+      fredda. Tutti gli altri moduli sono foglie — si allacciano al
+      conduttore che toccano, ma non lo prolungano: una fila di dormitori
+      <b>non</b> è un cavo, per quello esistono i corridoi. Un conduttore
+      in avaria conduce comunque (è ancora un tubo, non un buco); un
+      reattore in avaria no.</p>
 
       <div class="note">Sì, anche quel corridoio spelacchiato in fondo alla
-      mappa. Specialmente quello.</div>
+      mappa. Specialmente quello: senza di lui la foglia in fondo non
+      sente niente.</div>
     </div>
 
     <div class="side">
@@ -508,6 +513,10 @@ hr.torn{
           <li>Una rete piena di corridoi ma senza reattore è comunque
           ferraglia fredda: il filo deve arrivare a una fonte, non solo
           esistere.</li>
+          <li>Una fila di moduli non è un cavo: solo reattori e corridoi
+          conducono. Se allontani un dormitorio dal reattore senza un
+          corridoio in mezzo, resta scollegato — non in blackout, proprio
+          fuori dalla rete.</li>
         </ul>
       </div>
     </div>
@@ -591,7 +600,7 @@ hr.torn{
         <span class="stat"><span class="lab">O2</span> +50</span>
         <span class="stat"><span class="lab">CAL</span> +5</span>
       </div>
-      <p class="note-txt">L'aria per 5 persone. Non una di più — vedi capitolo 8.</p>
+      <p class="note-txt">L'aria per 5 persone. Non una di più — vedi capitolo 9.</p>
     </div>
 
     <div class="mod-card">
@@ -654,7 +663,7 @@ hr.torn{
       </div>
       <div class="stats">
         <span class="stat"><span class="lab">EN</span> 0</span>
-        <span class="stat"><span class="lab">CAL</span> +2</span>
+        <span class="stat"><span class="lab">CAL</span> +1</span>
       </div>
       <p class="note-txt">Non produce niente. Aspetta solo il momento giusto per essere eroica.</p>
     </div>
@@ -667,9 +676,9 @@ hr.torn{
         <div><h4>Serra</h4><span class="key">8</span></div>
       </div>
       <div class="stats">
-        <span class="stat"><span class="lab">EN</span> −10</span>
-        <span class="stat"><span class="lab">O2</span> +20</span>
-        <span class="stat"><span class="lab">CAL</span> +8</span>
+        <span class="stat"><span class="lab">EN</span> −8</span>
+        <span class="stat"><span class="lab">O2</span> +25</span>
+        <span class="stat"><span class="lab">CAL</span> +6</span>
       </div>
       <p class="note-txt">"Prescrizione verde", la chiama Tomas.</p>
     </div>
@@ -720,14 +729,14 @@ hr.torn{
 
   <h3 class="zine-title">Schede speciali (i moduli con un carattere)</h3>
   <div class="special-grid">
-    <div class="special"><b>Batteria</b> — immagazzina fino a <b>150</b> di
-    energia: si carica dal surplus della sua rete (al massimo 15 per tick)
+    <div class="special"><b>Batteria</b> — immagazzina fino a <b>250</b> di
+    energia: si carica dal surplus della sua rete (al massimo 25 per tick)
     e la restituisce quando la rete va in deficit, <i>prima</i> che
     qualunque modulo si spenga. Margine energia negativo ma niente in
     blackout? Stai andando a batteria: goditi il tempo comprato, ma compra
     anche un reattore.</div>
     <div class="special"><b>Serra</b> — fa più ossigeno per unità di
-    energia del life support (2,0 contro 1,67) ma meno per cella, e scalda
+    energia del life support (3,1 contro 1,67) ma meno per cella, e scalda
     parecchio. Ottima per allungare l'aria in fondo a una rete lunga.</div>
     <div class="special"><b>Gru</b> — piazzala adiacente a un detrito e
     tienila accesa: dopo 12 tick di lavoro consecutivi rimuove il detrito e
@@ -746,7 +755,7 @@ hr.torn{
     <div class="txt">
       <b>I detriti.</b> Rocce alla deriva che occupano celle della griglia:
       non ci si costruisce, non si rimuovono da soli (tranne che con la
-      Gru, o con la Sonda demolitrice del Marketplace — capitolo 5). Non
+      Gru, o con la Sonda demolitrice del Marketplace — capitolo 6). Non
       consumano niente e non fanno niente — ti tolgono solo lo spazio, che
       a fine campagna è la risorsa più preziosa di tutte.
       <div class="log-line">"Detriti sulla griglia: costruisci intorno"</div>
@@ -756,9 +765,94 @@ hr.torn{
 
 <hr class="torn">
 
-<!-- ============ CAP 3: STORIA E EQUIPAGGIO ============ -->
+<!-- ============ CAP 3: GLI IMPREVISTI ============ -->
 <section class="section">
   <div class="kicker">capitolo 3</div>
+  <h2 class="zine-title">Gli imprevisti</h2>
+  <p class="lead">Manuale d'emergenza, versione breve: da un certo punto in
+  poi lo spazio intorno alla stazione smette di starsene per i fatti suoi.
+  Quattro cose possono succedere — tre ti vogliono male, una no — e per le
+  prime tre l'universo, sorprendentemente educato, suona il campanello
+  prima di entrare.</p>
+
+  <div class="cols">
+    <div>
+      <p>I primi tick di ogni partita sono di grazia (una trentina di
+      secondi buoni): costruisci in pace, niente cade dal cielo. Da lì in
+      poi il gioco tira un dado silenzioso, con un intervallo minimo
+      garantito tra un imprevisto e il successivo e la regola che due di
+      fila non sono mai dello stesso tipo. In <b>Campagna gli imprevisti
+      restano spenti fino al livello 8</b>: i primi sette sono scuola
+      guida, il resto è meteo vero.</p>
+
+      <div class="callout">
+        <div class="sticker">preavviso</div>
+        <p style="margin-top:6px">I tre imprevisti cattivi non colpiscono
+        mai a tradimento: <b>4 tick prima dell'impatto</b> (circa tre
+        secondi) parte la sirena, in alto lampeggia il faro d'emergenza e
+        la musica si mette in pausa da sola — come se preferisse ascoltare
+        anche lei come va a finire. Non è tanto tempo, ma è tempo vero: a
+        volte basta per spostare l'attenzione, quasi mai per costruire
+        qualcosa in soccorso. Il Passaggio del pianeta, l'unico benigno,
+        non ha sirena: arriva senza annunciare niente di cattivo, perché
+        non lo è.</p>
+      </div>
+    </div>
+    <div class="side">
+      <div class="debris-box">
+        <img class="sprite" src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAAZ0lEQVR42mNgoAXg5hP5jw0TrfmFjy1WTNAQZM2fLnmDMUmG4LOd9gbgCjiiAhQkEJJY8L9n5gqiMEgtiiEwA27ce0YUxmqAnpkLWIIYDFKLYQA5GCMcMEzGEtA41RCTZElO1kMDAADVy/CXyekx9wAAAABJRU5ErkJggg==" alt="Il faro d'emergenza">
+        <div class="txt">
+          <b>Il faro d'emergenza.</b> Compare in alto, al centro dello
+          schermo, e lampeggia finché dura la sirena — niente da cliccare,
+          niente da spegnere: si guarda e basta, e quando sparisce vuol
+          dire che l'impatto è già scattato.
+          <div class="log-line">"Allarme: meteorite in arrivo"</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <h3 class="zine-title tilt-r">I quattro imprevisti</h3>
+  <div class="special-grid">
+    <div class="special"><b>Meteorite</b> — punta una cella a caso della
+    griglia. Se c'è un modulo sano, va fuori uso all'impatto (avaria, non
+    distruzione: si ripara come tutte le altre); se cade nel vuoto, il
+    registro lo annota e la giornata continua. Il lampo bianco sulla cella
+    colpita è tutto il dramma che si concede.</div>
+    <div class="special"><b>Tempesta elettromagnetica</b> — per una decina
+    di tick i sistemi termici impazziscono: il surriscaldamento avanza da
+    solo, un passo a tick, anche a bilancio calore perfettamente in ordine.
+    Non spegne niente di suo: ti avvicina solo, in silenzio, all'avaria a
+    caso dei 6 tick in positivo.</div>
+    <div class="special"><b>Sciame di micrometeoriti</b> — all'impatto
+    spezza uno o due corridoi sani, a caso. Con la regola dei conduttori
+    del capitolo 1 non è un dettaglio: colpisce la <b>dorsale</b>, non le
+    foglie appese ai lati. Senza corridoi in giro, passa senza fare
+    danni — un motivo in più per non trattarli come riempitivo.</div>
+    <div class="special" style="border-color:var(--green)"><b>Passaggio
+    del pianeta</b> — l'unico bello della lista. Per una quindicina di
+    tick un pianeta enorme scivola nello sfondo e gli arrivi raddoppiano:
+    un colono in più ogni 4 tick, se c'è un posto letto libero e l'aria è
+    buona (riserva sopra 50). Niente sirena, niente musica in pausa: solo
+    panorama.</div>
+  </div>
+
+  <div class="callout tip">
+    <div class="sticker">consiglio di sopravvivenza</div>
+    <p style="margin-top:6px">Quando parte la sirena, guarda il cielo e la
+    dorsale: il cielo per capire se sta arrivando un meteorite solitario o
+    uno sciame (e quale cella è nel mirino), la dorsale di corridoi perché
+    è lì, non altrove, che lo sciame morde. Per la tempesta non c'è dove
+    guardare — solo il termometro, e magari un radiatore tenuto di
+    scorta.</p>
+  </div>
+</section>
+
+<hr class="torn">
+
+<!-- ============ CAP 4: STORIA E EQUIPAGGIO ============ -->
+<section class="section">
+  <div class="kicker">capitolo 4</div>
   <h2 class="zine-title">La storia e l'equipaggio</h2>
 
   <div class="cols">
@@ -937,9 +1031,9 @@ hr.torn{
 
 <hr class="torn">
 
-<!-- ============ CAP 4: MODALITA ============ -->
+<!-- ============ CAP 5: MODALITA ============ -->
 <section class="section">
-  <div class="kicker">capitolo 4</div>
+  <div class="kicker">capitolo 5</div>
   <h2 class="zine-title">Le modalità di gioco</h2>
 
   <div class="cols rev">
@@ -954,14 +1048,15 @@ hr.torn{
       <div class="callout tip" style="margin-top:18px">
         <div class="sticker">medaglie</div>
         <p style="margin-top:6px">Solo in Campagna: chiudi un livello entro
-        il <b>40%</b> del tempo limite e prendi l'<b>oro</b>, entro il
-        <b>70%</b> l'<b>argento</b>, entro il tetto il <b>rame</b>. Nella
-        griglia di selezione il numero del livello si colora di
-        conseguenza (oro = giallo, argento = bianco, rame = ruggine), il
-        saldo crediti è scritto lì accanto, e la prima volta che migliori
-        una medaglia incassi crediti — pochi, apposta: rame 1, argento 2,
-        oro 3. Si spendono al Marketplace, capitolo 5. Il briefing di un
-        livello già tentato mostra la medaglia che hai già in bacheca e i
+        il <b>35%</b> del tempo limite e prendi l'<b>oro</b> (1:38 sui 400
+        tick del tetto standard), entro il <b>60%</b> l'<b>argento</b>
+        (2:48), entro il tetto il <b>rame</b>. Nella griglia di selezione
+        il numero del livello si colora di conseguenza (oro = giallo,
+        argento = bianco, rame = ruggine), il saldo crediti è scritto lì
+        accanto, e la prima volta che migliori una medaglia incassi
+        crediti — pochi, apposta: rame 1, argento 2, oro 3. Si spendono al
+        Marketplace, capitolo 6. La pagina obiettivo del prologo, per un
+        livello già tentato, mostra la medaglia che hai già in bacheca e i
         tempi esatti da battere per la prossima — e se in partita conquisti
         l'oro parte un jingle tutto suo, diverso dalla solita fanfara di
         fine livello.</p>
@@ -1000,27 +1095,28 @@ hr.torn{
 
 <hr class="torn">
 
-<!-- ============ CAP 5: MERCATO ============ -->
+<!-- ============ CAP 6: MERCATO ============ -->
 <section class="section">
-  <div class="kicker">capitolo 5</div>
+  <div class="kicker">capitolo 6</div>
   <h2 class="zine-title">Il Marketplace</h2>
   <p class="lead">Il <b>Marketplace</b> non è in partita: è una voce del
   <b>menu principale</b>. Ci si compra con il <b>saldo crediti</b> — quello
   che guadagni completando livelli di campagna e prendendo medaglie (vedi
-  capitolo 4). Ogni facility comprata diventa una <b>scorta</b> persistente
+  capitolo 5). Ogni facility comprata diventa una <b>scorta</b> persistente
   nel tuo portafoglio, non un acquisto usa-e-getta della singola run: resta
   lì finché non la consumi, anche su partite diverse.</p>
 
-  <p>In partita premi <span class="key">M</span> (o il bottone
-  <b>SCORTE</b> nell'HUD) per aprire l'inventario di quello che hai in
-  magazzino: un click su una scorta la consuma e ne applica subito
-  l'effetto. Le scorte non si sprecano <b>mai</b>: quella che qui non
-  avrebbe effetto — coloni senza posti letto liberi, ossigeno con la
-  riserva già al massimo, spurgo senza surriscaldamento accumulato,
-  riparazione senza nessuna avaria in corso, ampliamento stiva senza un
-  budget moduli da ampliare, sonda senza detriti da demolire — si mostra
-  spenta col motivo scritto lì accanto e semplicemente non si consuma: il
-  click su una scorta spenta non fa nulla, il magazzino resta intatto.</p>
+  <p>In partita le scorte non si aprono da nessun menu: vivono come
+  <b>icone</b> nella colonna a sinistra dello schermo, appena sopra il
+  pannello di ispezione, una per tipo posseduto. Passarci sopra col mouse
+  apre un tooltip con nome, effetto e stato; un click la consuma e ne
+  applica subito l'effetto. Le scorte non si sprecano <b>mai</b>: quella
+  che adesso non avrebbe effetto — coloni senza posti letto liberi,
+  ossigeno con la riserva già al massimo, spurgo senza surriscaldamento
+  accumulato, riparazione senza nessuna avaria in corso, ampliamento
+  stiva senza un budget moduli da ampliare, sonda senza detriti da
+  demolire — appare smorzata col motivo scritto nel tooltip: il click su
+  un'icona spenta non fa nulla, il magazzino resta intatto.</p>
 
   <div class="callout info">
     <div class="sticker">nessun euro coinvolto</div>
@@ -1028,7 +1124,7 @@ hr.torn{
     il giro è tutto interno al gioco. <b>Medaglia</b> in campagna →
     <b>credito</b> in tasca → <b>scorta</b> comprata al Marketplace →
     scorta consumata in partita quando serve respirare ancora un po'. I
-    crediti sono pochi apposta (capitolo 4): il Marketplace accorcia i
+    crediti sono pochi apposta (capitolo 5): il Marketplace accorcia i
     livelli, non li regala.</p>
   </div>
 
@@ -1077,9 +1173,9 @@ hr.torn{
 
 <hr class="torn">
 
-<!-- ============ CAP 6: COMANDI ============ -->
+<!-- ============ CAP 7: COMANDI ============ -->
 <section class="section">
-  <div class="kicker">capitolo 6</div>
+  <div class="kicker">capitolo 7</div>
   <h2 class="zine-title">Comandi</h2>
   <p class="lead">La tastiera, tradotta in italiano di bordo.</p>
   <div class="kbd-wrap">
@@ -1093,7 +1189,8 @@ hr.torn{
         <tr><td>click destro</td><td>rimuove il modulo sulla cella</td></tr>
         <tr><td><span class="key">R</span></td><td>ripara il modulo in avaria sotto il cursore</td></tr>
         <tr><td><span class="key">Spazio</span></td><td>avvia/ferma la simulazione (da fermi si costruisce senza conseguenze, l'HUD mostra l'anteprima)</td></tr>
-        <tr><td><span class="key">M</span></td><td>apre le scorte (il Marketplace si compra dal menu principale)</td></tr>
+        <tr><td>click su un'icona scorta</td><td>consuma la scorta in colonna sinistra (il Marketplace si compra dal menu principale)</td></tr>
+        <tr><td>click sull'icona Registro</td><td>apre/chiude il registro eventi in basso — parte chiuso a ogni avvio</td></tr>
         <tr><td><span class="key">V</span></td><td>cicla la velocità di gioco ×1 / ×2 / ×4, mostrata accanto al timer</td></tr>
         <tr><td><span class="key">Esc</span></td><td>menu di pausa (congela anche il tempo) — anche col bottone MENU nell'HUD</td></tr>
         <tr><td>frecce + <span class="key">Invio</span></td><td>navigano i menu</td></tr>
@@ -1111,9 +1208,9 @@ hr.torn{
 
 <hr class="torn">
 
-<!-- ============ CAP 7: AUDIO ============ -->
+<!-- ============ CAP 8: AUDIO ============ -->
 <section class="section">
-  <div class="kicker">capitolo 7</div>
+  <div class="kicker">capitolo 8</div>
   <h2 class="zine-title">L'audio</h2>
   <div class="panel">
     <p>Ogni suono della stazione è generato da uno script
@@ -1132,9 +1229,9 @@ hr.torn{
 
 <hr class="torn">
 
-<!-- ============ CAP 8: CONSIGLI ============ -->
+<!-- ============ CAP 9: CONSIGLI ============ -->
 <section class="section">
-  <div class="kicker">capitolo 8</div>
+  <div class="kicker">capitolo 9</div>
   <h2 class="zine-title">Consigli di sopravvivenza</h2>
   <p class="lead">Note appuntate sul retro della griglia, in ordine sparso.</p>
 
@@ -1168,7 +1265,7 @@ hr.torn{
       <span class="num">5</span>
       <p><b>La Batteria non produce niente — e vince partite.</b> Un picco
       di consumo (il laboratorio che si riattiva, l'avaria del reattore
-      gemello) si assorbe con 150 di carica. Guarda <code>batt</code>
+      gemello) si assorbe con 250 di carica. Guarda <code>batt</code>
       nell'HUD.</p>
     </div>
     <div class="sticky">

@@ -966,6 +966,30 @@ FIAMMA = [
 
 # =========================== FILE DA GENERARE =========================
 
+# ========================== REGISTRO 16x16 ============================
+# Icona del pannello log: un terminalino con righe di testo e cursore
+# verde. Colori neutri + un solo accento G (non e' un colore di stato
+# dell'HUD in questo contesto: e' il fosforo del terminale).
+
+REGISTRO = [
+    "................",
+    ".KKKKKKKKKKKKK..",
+    ".KDDDDDDDDDDDK..",
+    ".KDwwwwwwwDDDK..",
+    ".KDDDDDDDDDDDK..",
+    ".KDwwwwwwwwwDK..",
+    ".KDDDDDDDDDDDK..",
+    ".KDwwwwwDDDDDK..",
+    ".KDDDDDDDDDDDK..",
+    ".KDwwwwwwwwDDK..",
+    ".KDDDDDDDDDDDK..",
+    ".KDGGDDDDDDDDK..",
+    ".KDDDDDDDDDDDK..",
+    ".KKKKKKKKKKKKK..",
+    "...KllK..KllK...",
+    "................",
+]
+
 # ========================== CURSORE 16x16 =============================
 # Freccia pixel-art per il cursore custom della finestra: corpo quasi
 # bianco, contorno nero, coda in ciano. La punta e' in (0,0): l'hotspot
@@ -1246,8 +1270,130 @@ FAC_SONDA = [
     "................",
 ]
 
+
+
+# ======================= IMPREVISTI (sirena, meteora, pianeta) =========
+# La sirena e' il lampeggiante degli imprevisti negativi: due frame che si
+# alternano (luce rossa / luce blu-ciano). La meteora attraversa lo schermo
+# in diagonale (scia in alto a sinistra, testa rocciosa in basso a destra).
+# Il pianeta e' lo sfondo del passaggio ravvicinato: disco a bande con
+# anello davanti, generato col compasso e incollato qui come mappa.
+
+SIRENA_1 = [
+    "................",
+    ".....KKKKKK.....",
+    "....KRRRRRRK....",
+    "...KRRYYRRRRK...",
+    "...KRRRRRRRRK...",
+    "...KRRRRRRRRK...",
+    "..KKKKKKKKKKKK..",
+    ".KmllllllllllmK.",
+    ".KmwwwwwwwwwwmK.",
+    ".KgmmmmmmmmmmgK.",
+    ".KKKKKKKKKKKKKK.",
+    "..KgK......KgK..",
+    "..KKK......KKK..",
+    "................",
+    "................",
+    "................",
+]
+
+SIRENA_2 = [
+    "................",
+    ".....KKKKKK.....",
+    "....KCCCCCCK....",
+    "...KCCwwCCCCK...",
+    "...KCCCCCCCCK...",
+    "...KcCCCCCCcK...",
+    "..KKKKKKKKKKKK..",
+    ".KmllllllllllmK.",
+    ".KmwwwwwwwwwwmK.",
+    ".KgmmmmmmmmmmgK.",
+    ".KKKKKKKKKKKKKK.",
+    "..KgK......KgK..",
+    "..KKK......KKK..",
+    "................",
+    "................",
+    "................",
+]
+
+METEORA = [
+    "Kg..............",
+    ".KgD............",
+    "..KgD...........",
+    "...KgmD.........",
+    "....KgmD........",
+    ".....KgmlD......",
+    "......KmlK......",
+    ".......KrOOK....",
+    "......KrOOOlK...",
+    "......KOOrOOK...",
+    ".....KrOlOrOK...",
+    ".....KOOrOOrK...",
+    "......KrOOrK....",
+    ".......KKKK.....",
+    "................",
+    "................",
+]
+
+PIANETA = [
+    "................................................",
+    "................................................",
+    "................................................",
+    "................................................",
+    "................................................",
+    "....................KKKKKKKK....................",
+    ".................KKKKccccccKKKK.................",
+    "...............KKVVVVVVVVVVVVVVKK...............",
+    ".............KKCCCCCVVVVVVVVVVVVVKK.............",
+    "............KKCCCCCCCCVVVVVVVVVVVVKK............",
+    "...........KCCCCCCCCCCCVVVVVVVVVVVVVK...........",
+    "..........KCCCCCCCCCCCCCVVVVVVVVVVVVVK..........",
+    ".........KCCCCCCCCCCCCCCCVVVVVVVVVVVVVK.........",
+    "........KKCCCCCCCCCCCCCCCVVVVVVVVVVVVVKK........",
+    "mmm.....KlllllllllllllllllcccccccccccccK........",
+    "mmmmmmmKllllllllllllllllllccccccccccccccK.......",
+    "mm.....KllllllllllllllllllccccccccccccccK.......",
+    "m.....KcllllllllllllllllllcccccccccccccccK......",
+    "lm....KcllllllllllllllllllcccccccccccccccK......",
+    "mlmm..KcllllllllllllllllllcccccccccccccccK......",
+    "..mlmKKccllllllllllllllllccccccccccccccccKK.....",
+    "....mlmVVCCCCCCCCCCCCCCCCVVVVVVVVVVVVVVVVVK.....",
+    ".....KVmlmCCCCCCCCCCCCCCVVVVVVVVVVVVVVVVVVK.....",
+    ".....KVVVmlmCCCCCCCCCCCVVVVVVVVVVVVVVVVVVVK.....",
+    ".....KVVVVVVmlmCCCCCCCVVVVVVVVVVVVVVVVVVVVK.....",
+    ".....KVVVVVVVVCmlmCCVVVVVVVVVVVVVVVVVVVVVVK.....",
+    ".....KVVVVVVVVVVVVllmVVVVVVVVVVVVVVVVVVVVVKm....",
+    ".....KKVVVVVVVVVVVVVVmlmVVVVVVVVVVVVVVVVVKKmmm..",
+    "......KcccccccccccccccccmlmccccccccccccccK..mmmm",
+    "......KccccccccccccccccccccmllmccccccccccK....mm",
+    "......KccccccccccccccccccccccccmllmccccccK.....m",
+    ".......Kcccccccccccccccccccccccccccmlllmm.....mm",
+    ".......Kcccccccccccccccccccccccccccccccmmlllllll",
+    "........KccccccccccccccccccccccccccccccK.....mmm",
+    "........KKccccccccccccccccccccccccccccKK........",
+    ".........KVVVVVVVVVVVVVVVVVVVVVVVVVVVVK.........",
+    "..........KVVVVVVVVVVVVVVVVVVVVVVVVVVK..........",
+    "...........KVVVVVVVVVVVVVVVVVVVVVVVVK...........",
+    "............KKVVVVVVVVVVVVVVVVVVVVKK............",
+    ".............KKVVVVVVVVVVVVVVVVVVKK.............",
+    "...............KKVVVVVVVVVVVVVVKK...............",
+    ".................KKKKVVVVVVKKKK.................",
+    "....................KKKKKKKK....................",
+    "................................................",
+    "................................................",
+    "................................................",
+    "................................................",
+    "................................................",
+]
+
 SPRITES = {
     "sprites/cursore.png": (CURSORE, 16, 16),
+    "sprites/imprevisti/sirena_1.png": (SIRENA_1, 16, 16),
+    "sprites/imprevisti/sirena_2.png": (SIRENA_2, 16, 16),
+    "sprites/imprevisti/meteora.png": (METEORA, 16, 16),
+    "sprites/imprevisti/pianeta.png": (PIANETA, 48, 48),
+    "sprites/registro.png": (REGISTRO, 16, 16),
     "sprites/mirino.png": (MIRINO, 16, 16),
     "sprites/facilities/ossigeno.png": (FAC_OSSIGENO, 16, 16),
     "sprites/facilities/spurgo.png": (FAC_SPURGO, 16, 16),

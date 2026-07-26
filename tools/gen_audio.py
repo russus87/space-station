@@ -82,6 +82,25 @@ def inviluppo(campioni, attacco=0.004, rilascio=0.025):
 # Ogni suono è una lista di segmenti/silenzi, concatenati nell'ordine.
 
 SUONI = {
+    # sirena degli imprevisti: bitonale che sale e scende, ~2.5 s
+    "sirena.wav": [
+        seg(0.40, 660, forma="quadra", vol=0.85),
+        seg(0.40, 880, forma="quadra", vol=0.85),
+        seg(0.40, 660, forma="quadra", vol=0.85),
+        seg(0.40, 880, forma="quadra", vol=0.85),
+        seg(0.40, 660, forma="quadra", vol=0.85),
+        seg(0.45, 880, 640, "quadra", vol=0.8),
+    ],
+    # impatto del meteorite: botto sordo, ~0.4 s
+    "impatto.wav": [
+        seg(0.08, 220, 70, "quadra", rumore=0.6),
+        seg(0.32, 90, 42, "seno", rumore=0.25),
+    ],
+    # passaggio del pianeta: whoosh grave gentile, ~1.5 s
+    "pianeta.wav": [
+        seg(0.70, 52, 110, "seno", rumore=0.40, vol=0.9),
+        seg(0.80, 110, 48, "seno", rumore=0.40, vol=0.9),
+    ],
     # click UI secco, ~60 ms
     "click.wav": [seg(0.06, 1800, 900, "quadra")],
     # piazzamento modulo: clunk meccanico ascendente, ~150 ms

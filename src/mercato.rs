@@ -1,20 +1,19 @@
-//! Catalogo delle facilities e SCORTE in partita.
+//! Catalogo delle facilities e uso delle SCORTE in partita.
 //!
 //! Le facilities si comprano nel **Marketplace** del menu principale
 //! (`menu.rs`) coi CREDITI delle medaglie (`progressi.rs`) — pochi e
 //! sudati, mai valuta reale. Quelle comprate diventano scorte persistenti
-//! (`Portafoglio::scorte`); in partita il tasto `M` (o il bottone
-//! nell'HUD) apre questo overlay, che le elenca: click su una scorta = la
-//! si consuma e l'effetto si applica subito. Una scorta che ADESSO non
-//! avrebbe effetto — ampliamento senza budget, sonda senza detriti, coloni
-//! senza posti liberi, ossigeno a riserva piena, spurgo a stazione fredda,
-//! riparazione senza avarie — si mostra spenta col motivo e non si può
-//! sprecare (`non_applicabile`, ricontrollato anche al click).
+//! (`Portafoglio::scorte`); in partita vivono come ICONE nella colonna
+//! sinistra (`ui.rs`: fila sopra il pannello ispezione, tooltip al
+//! passaggio del mouse): click sull'icona = si consuma la scorta e
+//! l'effetto si applica subito. Una scorta che ADESSO non avrebbe effetto
+//! — ampliamento senza budget, sonda senza detriti, coloni senza posti
+//! liberi, ossigeno a riserva piena, spurgo a stazione fredda, riparazione
+//! senza avarie — si mostra smorzata col motivo nel tooltip e non si può
+//! sprecare (`motivo_non_applicabile`, ricontrollato anche al click).
 
-use crate::menu::{AppState, Pausa};
 use crate::progressi::Portafoglio;
 use crate::sim::{EventLog, Module, O2_MAX, Sim};
-use crate::ui::{BIANCO, CIANO, GIALLO, GRIGIO_MEDIO, GRIGIO_SCAFO, METALLO, NERO, SCAFO_SCURO};
 use crate::{GRID_H, GRID_W, Ostacolo, Station};
 use bevy::prelude::*;
 
@@ -78,8 +77,10 @@ pub const FACILITIES: [FacilityDef; 6] = [
     },
 ];
 
-/// Stato dell'overlay scorte: solo aperto/chiuso. L'inventario vero vive
-/// in `Portafoglio` (persistente), non qui.
+/// Residuo dell'overlay scorte (rimosso: le scorte sono icone in `ui.rs`).
+/// Resta come risorsa sempre-`false` perché main.rs la consulta nelle run
+/// condition (`costruzione_permessa`, cursore): si può eliminare insieme a
+/// quei riferimenti.
 #[derive(Resource, Default)]
 pub struct Mercato {
     pub aperto: bool,
@@ -102,17 +103,18 @@ pub fn conteggio_scorte(scorte: &[usize]) -> Vec<(usize, usize)> {
         .collect()
 }
 
-/// Perché una scorta NON è usabile ADESSO; `None` = usabile. Copre sia i
-/// vincoli di livello (budget, detriti) sia lo stato corrente della
-/// simulazione: una scorta non si spreca mai per un effetto nullo —
-/// niente coloni senza posti, niente ossigeno a riserva piena, niente
-/// riparazioni senza avarie, niente spurghi a stazione fredda.
-fn non_applicabile(
-    effetto: Effetto,
+/// Perché la scorta di catalogo `indice` NON è usabile ADESSO; `None` =
+/// usabile. Copre sia i vincoli di livello (budget, detriti) sia lo stato
+/// corrente della simulazione: una scorta non si spreca mai per un effetto
+/// nullo — niente coloni senza posti, niente ossigeno a riserva piena,
+/// niente riparazioni senza avarie, niente spurghi a stazione fredda.
+pub fn motivo_non_applicabile(
+    indice: usize,
     station: &Station,
     sim: &Sim,
     avarie: usize,
 ) -> Option<&'static str> {
+    let effetto = FACILITIES.get(indice)?.effetto;
     match effetto {
         Effetto::Stiva if station.max_moduli.is_none() => Some("qui non c'è un budget moduli"),
         Effetto::Demolizione if station.ostacoli.is_empty() => Some("non ci sono detriti"),
@@ -126,212 +128,21 @@ fn non_applicabile(
     }
 }
 
-/// L'applicabilità di tutto il catalogo, per accorgersi dei cambi mentre
-/// l'overlay è aperto (la sim continua a girare sotto): quando un vettore
-/// differisce dal precedente, l'overlay va ricostruito.
-fn applicabilita(station: &Station, sim: &Sim, avarie: usize) -> Vec<bool> {
-    FACILITIES
-        .iter()
-        .map(|f| non_applicabile(f.effetto, station, sim, avarie).is_none())
+/// L'applicabilità di tutto il catalogo: la fila di icone in `ui.rs` si
+/// ricostruisce quando questo vettore cambia (la sim gira e una scorta può
+/// diventare inutile — o utile — da un tick all'altro).
+pub fn applicabilita(station: &Station, sim: &Sim, avarie: usize) -> Vec<bool> {
+    (0..FACILITIES.len())
+        .map(|i| motivo_non_applicabile(i, station, sim, avarie).is_none())
         .collect()
-}
-
-// ---------------- input ----------------
-
-/// `M` apre e chiude le scorte (solo in partita, mai sotto il menu Esc).
-pub fn toggle_tasto(
-    tasti: Res<ButtonInput<KeyCode>>,
-    pausa: Res<Pausa>,
-    mut mercato: ResMut<Mercato>,
-) {
-    if pausa.aperta {
-        return;
-    }
-    if tasti.just_pressed(KeyCode::KeyM) {
-        mercato.aperto = !mercato.aperto;
-    }
-}
-
-/// Il bottone nell'HUD (marker in ui.rs) fa lo stesso di `M`.
-pub fn click_bottone(
-    q: Query<&Interaction, (Changed<Interaction>, With<crate::ui::BottoneMercato>)>,
-    pausa: Res<Pausa>,
-    mut mercato: ResMut<Mercato>,
-) {
-    for interazione in &q {
-        if *interazione == Interaction::Pressed && !pausa.aperta {
-            mercato.aperto = !mercato.aperto;
-        }
-    }
-}
-
-// ---------------- overlay ----------------
-
-#[derive(Component)]
-pub struct SchermataMercato;
-
-/// Una riga di scorta usabile; il valore è l'indice nel catalogo.
-#[derive(Component)]
-pub struct VoceMercato(pub usize);
-
-fn testo(t: impl Into<String>, px: f32, colore: Color) -> impl Bundle {
-    (
-        Text::new(t),
-        TextFont {
-            font_size: FontSize::Px(px),
-            ..default()
-        },
-        TextColor(colore),
-    )
-}
-
-/// L'overlay esiste solo quando le scorte sono aperte, in partita e senza
-/// il menu di pausa sopra; si ricostruisce quando l'inventario cambia o
-/// quando cambia l'applicabilità di una scorta (la sim continua a girare
-/// sotto: una riparazione può diventare inutile — o utile — da un tick
-/// all'altro).
-#[allow(clippy::too_many_arguments)]
-pub fn sincronizza(
-    mut commands: Commands,
-    stato: Res<State<AppState>>,
-    pausa: Res<Pausa>,
-    mercato: Res<Mercato>,
-    portafoglio: Res<Portafoglio>,
-    station: Res<Station>,
-    sim: Res<Sim>,
-    moduli: Query<&Module>,
-    art: Res<crate::Art>,
-    mut usabili_prima: Local<Vec<bool>>,
-    q: Query<Entity, With<SchermataMercato>>,
-) {
-    let avarie = moduli.iter().filter(|m| m.broken).count();
-    let usabili = applicabilita(&station, &sim, avarie);
-    let deve_esserci = mercato.aperto && *stato.get() == AppState::InGioco && !pausa.aperta;
-    let c_e = !q.is_empty();
-    let cambiate = usabili != *usabili_prima;
-    *usabili_prima = usabili;
-    if deve_esserci == c_e && !(deve_esserci && (portafoglio.is_changed() || cambiate)) {
-        return;
-    }
-    for e in &q {
-        commands.entity(e).despawn();
-    }
-    if !deve_esserci {
-        return;
-    }
-    let scorte = conteggio_scorte(&portafoglio.scorte);
-    commands
-        .spawn((
-            Node {
-                position_type: PositionType::Absolute,
-                width: Val::Percent(100.0),
-                height: Val::Percent(100.0),
-                flex_direction: FlexDirection::Column,
-                align_items: AlignItems::Center,
-                justify_content: JustifyContent::Center,
-                row_gap: Val::Px(8.0),
-                ..default()
-            },
-            BackgroundColor(NERO.with_alpha(0.7)),
-            GlobalZIndex(15),
-            SchermataMercato,
-        ))
-        .with_children(|r| {
-            r.spawn(testo("SCORTE", 34.0, BIANCO));
-            r.spawn(testo(
-                "si comprano nel Marketplace, dal titolo — le medaglie fruttano crediti",
-                13.0,
-                GRIGIO_MEDIO,
-            ));
-            r.spawn((Node {
-                margin: UiRect::bottom(Val::Px(10.0)),
-                ..default()
-            },))
-            .with_children(|c| {
-                c.spawn(testo(
-                    format!("hai {} crediti", portafoglio.crediti),
-                    15.0,
-                    GIALLO,
-                ));
-            });
-            if scorte.is_empty() {
-                r.spawn(testo(
-                    "Nessuna scorta: compra nel Marketplace dal titolo",
-                    15.0,
-                    GRIGIO_MEDIO,
-                ));
-            }
-            for (idx, quante) in scorte {
-                let f = &FACILITIES[idx];
-                let riga = if quante > 1 {
-                    format!("{} ×{}  —  {}", f.nome, quante, f.descrizione)
-                } else {
-                    format!("{}  —  {}", f.nome, f.descrizione)
-                };
-                let icona = |c: &mut ChildSpawnerCommands, spenta: bool| {
-                    c.spawn((
-                        ImageNode {
-                            image: art.facilities[idx].clone(),
-                            color: if spenta { GRIGIO_MEDIO } else { Color::WHITE },
-                            ..default()
-                        },
-                        Node {
-                            width: Val::Px(32.0),
-                            height: Val::Px(32.0),
-                            flex_shrink: 0.0,
-                            ..default()
-                        },
-                    ));
-                };
-                if let Some(motivo) = non_applicabile(f.effetto, &station, &sim, avarie) {
-                    r.spawn(Node {
-                        flex_direction: FlexDirection::Row,
-                        align_items: AlignItems::Center,
-                        column_gap: Val::Px(8.0),
-                        ..default()
-                    })
-                    .with_children(|c| {
-                        icona(c, true);
-                        c.spawn(testo(
-                            format!("{riga}  (qui non serve: {motivo})"),
-                            15.0,
-                            GRIGIO_SCAFO,
-                        ));
-                    });
-                } else {
-                    r.spawn((
-                        Node {
-                            flex_direction: FlexDirection::Row,
-                            align_items: AlignItems::Center,
-                            column_gap: Val::Px(8.0),
-                            padding: UiRect::axes(Val::Px(14.0), Val::Px(6.0)),
-                            border: UiRect::all(Val::Px(1.0)),
-                            ..default()
-                        },
-                        BackgroundColor(SCAFO_SCURO),
-                        BorderColor::all(CIANO),
-                        Button,
-                        VoceMercato(idx),
-                    ))
-                    .with_children(|c| {
-                        icona(c, false);
-                        c.spawn(testo(riga, 15.0, METALLO));
-                    });
-                }
-            }
-            r.spawn(Node {
-                height: Val::Px(10.0),
-                ..default()
-            });
-            r.spawn(testo("M per chiudere", 12.0, GRIGIO_MEDIO));
-        });
 }
 
 // ---------------- uso delle scorte ----------------
 
+/// Click su un'icona scorta (`ui::IconaScorta`): consuma e applica.
 #[allow(clippy::too_many_arguments)]
 pub fn click_scorte(
-    q: Query<(&Interaction, &VoceMercato), Changed<Interaction>>,
+    q: Query<(&Interaction, &crate::ui::IconaScorta), Changed<Interaction>>,
     mut commands: Commands,
     mut portafoglio: ResMut<Portafoglio>,
     mut sim: ResMut<Sim>,
@@ -342,21 +153,21 @@ pub fn click_scorte(
     mut moduli: Query<&mut Module>,
     ostacoli_q: Query<(Entity, &Ostacolo)>,
 ) {
-    for (interazione, voce) in &q {
+    for (interazione, icona) in &q {
         if *interazione != Interaction::Pressed {
             continue;
         }
-        let Some(f) = FACILITIES.get(voce.0) else {
+        let Some(f) = FACILITIES.get(icona.0) else {
             continue;
         };
-        // doppio controllo: l'overlay non mostra bottoni per le scorte non
-        // applicabili, ma tra spawn e click lo stato può essere cambiato —
-        // e una scorta non si consuma MAI per un effetto nullo
+        // doppio controllo: l'icona smorzata è già muta e inerte, ma tra
+        // frame e click lo stato può essere cambiato — e una scorta non si
+        // consuma MAI per un effetto nullo
         let avarie = moduli.iter().filter(|m| m.broken).count();
-        if non_applicabile(f.effetto, &station, &sim, avarie).is_some() {
+        if motivo_non_applicabile(icona.0, &station, &sim, avarie).is_some() {
             continue;
         }
-        if !portafoglio.usa(voce.0) {
+        if !portafoglio.usa(icona.0) {
             continue;
         }
         match f.effetto {
@@ -418,7 +229,18 @@ mod test {
 
     #[test]
     fn gli_indici_fuori_catalogo_non_rompono_il_conteggio() {
-        // un progressi.txt scritto a mano non deve far crashare l'overlay
+        // un progressi.txt scritto a mano non deve far crashare la fila
         assert_eq!(conteggio_scorte(&[99, 2]), vec![(2, 1)]);
+    }
+
+    #[test]
+    fn un_indice_fuori_catalogo_non_panica() {
+        let station = Station::default();
+        let sim = Sim::default();
+        // il caso non si presenta (le icone nascono dal conteggio filtrato)
+        // ma un progressi.txt a mano non deve far crollare nulla
+        motivo_non_applicabile(99, &station, &sim, 0);
+        // il vettore di applicabilità copre esattamente il catalogo
+        assert_eq!(applicabilita(&station, &sim, 0).len(), FACILITIES.len());
     }
 }

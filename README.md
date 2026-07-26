@@ -2,10 +2,13 @@
 
 Gioco di bilancio di risorse con cascata di guasti: si costruisce una stazione
 su una griglia, si avvia la simulazione e si reagisce ai guasti a catena.
-L'energia si propaga solo tra moduli adiacenti (ogni gruppo connesso è una
-rete, e serve un reattore per rete); l'obiettivo è far crescere l'equipaggio
-e tenerlo vivo: il punteggio è persone·tick e la partita finisce quando
-l'equipaggio torna a zero. Rust + Bevy 0.19, pixel art generata da script
+L'energia viaggia solo lungo i conduttori — reattori e corridoi — e gli
+altri moduli si allacciano come foglie a un conduttore adiacente: ogni
+stazione è una dorsale di corridoi con i moduli appesi ai lati. Obiettivo:
+far crescere l'equipaggio e tenerlo vivo tra blackout, surriscaldamenti e
+imprevisti dallo spazio (meteoriti, tempeste elettromagnetiche, sciami — e
+ogni tanto un pianeta di passaggio che porta gente); il punteggio è
+persone·tick e la partita finisce quando l'equipaggio torna a zero. Rust + Bevy 0.19, pixel art generata da script
 (`tools/gen_sprites.py`).
 
 Quattro modalità: la **Campagna** (50 livelli in sequenza — 6 curati che
@@ -17,7 +20,7 @@ l'Infinita ma con un tetto di 400 tick: partite brevi e confrontabili) e
 il **Livello casuale** (generato al momento, fuori da progressione e
 classifiche). Infinita e Sfida hanno ciascuna la propria **classifica**
 locale top 10. In campagna il tempo fa le **medaglie** (oro/argento/rame
-sulle soglie 40%/70%/100% del limite) che fruttano crediti da spendere nel
+sulle soglie 35%/60%/100% del limite) che fruttano crediti da spendere nel
 **Marketplace** — scorte una tantum da usare in partita, mai valuta reale. Classifiche e
 progressione della campagna sono file di testo semplice in
 `$XDG_DATA_HOME/space-station/` (ripiego `~/.local/share/space-station/`):
@@ -63,17 +66,18 @@ il percorso di `assets/` è risolto a runtime.
 | `Spazio` | avvia/ferma la simulazione (da fermo si costruisce senza conseguenze, l'HUD mostra l'anteprima del bilancio) |
 | `V` | velocità di gioco ×1/×2/×4 (stesse regole, tick più rapidi) |
 | `Esc` | apre il menu di pausa (con i volumi) e **congela il tick** (è un'altra cosa rispetto a `Spazio`) |
-| `M` | apre le scorte comprate nel Marketplace coi crediti delle medaglie |
 | `F12` | salva uno screenshot nella cartella corrente |
 | frecce + `Invio` | navigano i menu (nella griglia livelli: su/giù riga, sinistra/destra cella; `Invio` avanza anche il prologo) |
 
 Un modulo fermo dice sempre *perché*: velo scuro con fulmine giallo = la sua
-rete non ha energia a sufficienza, fulmine grigio = scollegato (la sua rete
-non ha un reattore funzionante: servono moduli adiacenti che lo colleghino,
-i corridoi costano poco), omino = manca equipaggio, velo rosso con triangolo
-lampeggiante = avaria. Il pannello in basso a sinistra descrive per esteso il
-modulo sotto il cursore. Il registro eventi in fondo racconta la catena
-causale (ultime 8 righe, timestamp in tick, colorate per gravità).
+rete non ha energia a sufficienza, fulmine grigio = scollegato (non tocca
+nessun conduttore alimentato: serve la dorsale di corridoi fino a lì),
+omino = manca equipaggio, velo rosso con triangolo lampeggiante = avaria.
+Il pannello in basso a sinistra descrive per esteso il modulo sotto il
+cursore; sopra, le icone delle scorte comprate nel Marketplace (tooltip al
+passaggio, click per usarle). Il **Registro** eventi in fondo — chiuso di
+default, si apre con un click — racconta la catena causale (ultime 8
+righe, timestamp in tick, colorate per gravità).
 Quando l'equipaggio muore del tutto compare la schermata "STAZIONE PERSA"
 con punteggio, tick sopravvissuti ed equipaggio massimo; in campagna
 propone di riprovare il livello, in infinita dice se il punteggio è
@@ -120,13 +124,14 @@ e in `src/ui.rs` — e va tenuta allineata a `SPEC.md` §2.2.
 | `src/livelli.rs` | modalità, i 6 livelli curati + i 44 generati (50 totali), obiettivi, classifiche e progressione persistenti |
 | `src/generatore.rs` | il generatore parametrico dei livelli 7-50 e del livello casuale (seed deterministici, garanzia di risolvibilità) |
 | `src/progressi.rs` | medaglie per livello, crediti e scorte del Marketplace (persistenti) |
-| `src/mercato.rs` | catalogo facilities e overlay SCORTE in partita |
-| `src/personaggi.rs` | i cinque personaggi: battute dei briefing, intermezzi, annunci di sblocco, commenti in partita |
+| `src/mercato.rs` | catalogo facilities e uso delle scorte in partita |
+| `src/personaggi.rs` | i cinque personaggi: battute del prologo, intermezzi, annunci di sblocco, commenti in partita |
 | `src/prologo.rs` | il prologo a fumetto che apre ogni livello (solo alla prima visita) |
 | `src/commenti.rs` | i mini-fumetti dei personaggi sugli eventi di gioco |
+| `src/imprevisti.rs` | gli imprevisti casuali: meteoriti, tempeste, sciami, pianeti — con sirena e preavviso |
 | `src/musica.rs` | colonna sonora: traccia per blocco narrativo, pescata a caso nelle sandbox |
 | `src/audio.rs` | effetti sonori e regole di riproduzione |
 | `src/impostazioni.rs` | volumi musica/effetti, persistiti |
 | `src/main.rs` | griglia, piazzamento, autotiling dei corridoi, scala responsive, cursore/mirino, screenshot (F12, DEMO_FOTO), stati dell'app |
 | `src/ui.rs` | HUD (risorse, timer, obiettivo, punteggio, scorte), palette laterale, pannello ispezione, log |
-| `src/menu.rs` | titolo, campagna (selezione, briefing, intermezzi, livello completato), Marketplace, classifica, "come si gioca", pausa, fine partita |
+| `src/menu.rs` | titolo, campagna (selezione, intermezzi, livello completato), Marketplace, classifica, "come si gioca", pausa, fine partita |

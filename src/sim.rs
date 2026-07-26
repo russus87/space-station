@@ -19,8 +19,8 @@ pub const SOGLIA_O2_CRITICO: f32 = 30.0;
 pub const TICK_SURRISCALDAMENTO: u32 = 6; // tick consecutivi di calore in eccesso prima di un'avaria
 pub const TICK_MORTE: u32 = 3; // con ossigeno a zero, un morto ogni N tick
 pub const TICK_ARRIVO: u32 = 4; // con posti liberi e aria buona, un arrivo ogni N tick
-pub const CAPIENZA_BATTERIA: f32 = 150.0; // energia immagazzinabile per batteria
-pub const RICARICA_BATTERIA: f32 = 15.0; // carica massima per tick, dal surplus di rete
+pub const CAPIENZA_BATTERIA: f32 = 250.0; // energia immagazzinabile per batteria
+pub const RICARICA_BATTERIA: f32 = 25.0; // carica massima per tick, dal surplus di rete
 pub const TICK_LAVORO_GRU: u32 = 12; // tick attivi consecutivi per rimuovere un detrito
 /// Tetto di sicurezza: oltre questo tick la partita finisce comunque, vinta o
 /// no. Senza, una stazione bloccata in una spirale di asfissia lenta (morti
@@ -340,18 +340,23 @@ pub fn sim_tick(
         .sum();
 
     // --- 2) reti elettriche e allocazione per priorità (cascata stadio 1) ---
-    // L'energia si propaga solo tra moduli su celle ortogonalmente adiacenti
-    // (4 vicini): ogni componente connessa è una rete isolata, alimentata solo
-    // se contiene almeno un reattore non in avaria. I moduli in avaria
-    // conducono comunque corrente — sono ancora tubi, non buchi — ma un
-    // reattore rotto non produce e non "accende" la sua rete.
+    // L'energia viaggia solo nei CONDUTTORI — reattori e corridoi — su celle
+    // ortogonalmente adiacenti (4 vicini). Gli altri moduli sono FOGLIE: si
+    // allacciano a una rete se toccano un suo conduttore, ma non la
+    // prolungano — una fila di dormitori non è un cavo, i corridoi esistono
+    // per questo. Un conduttore in avaria conduce comunque (è ancora un
+    // tubo, non un buco), ma un reattore rotto non produce e non "accende"
+    // la sua rete. Una foglia che tocca due reti finisce nella prima che la
+    // raggiunge (ordine deterministico: priorità, poi seq).
     // Ossigeno, calore ed equipaggio restano a livello di stazione.
+    let conduce =
+        |m: &Module| matches!(m.kind, ModuleKind::Reattore | ModuleKind::Corridoio);
     let per_cella: HashMap<IVec2, usize> =
         mods.iter().enumerate().map(|(i, m)| (m.cella, i)).collect();
     let mut comp = vec![usize::MAX; mods.len()];
     let mut n_comp = 0;
     for inizio in 0..mods.len() {
-        if comp[inizio] != usize::MAX {
+        if comp[inizio] != usize::MAX || !conduce(&mods[inizio]) {
             continue;
         }
         comp[inizio] = n_comp;
@@ -363,11 +368,21 @@ pub fn sim_tick(
                     && comp[j] == usize::MAX
                 {
                     comp[j] = n_comp;
-                    coda.push(j);
+                    if conduce(&mods[j]) {
+                        coda.push(j); // il conduttore prolunga la rete
+                    } // la foglia si allaccia e basta
                 }
             }
         }
         n_comp += 1;
+    }
+    // le foglie che non toccano nessun conduttore sono isole a sé: reti
+    // senza reattore, quindi scollegate
+    for c in comp.iter_mut() {
+        if *c == usize::MAX {
+            *c = n_comp;
+            n_comp += 1;
+        }
     }
     // In ogni rete i produttori vanno sommati TUTTI prima di distribuire: se
     // li si contasse man mano nell'ordine di priorità, un modulo costruito
@@ -698,10 +713,14 @@ mod test {
     // --- sim_tick vero, in un World in miniatura ---
 
     fn modulo(kind: ModuleKind, x: i32, seq: u32) -> Module {
+        modulo_xy(kind, x, 0, seq)
+    }
+
+    fn modulo_xy(kind: ModuleKind, x: i32, y: i32, seq: u32) -> Module {
         Module {
             kind,
             etichetta: format!("{:?} {seq}", kind),
-            cella: IVec2::new(x, 0),
+            cella: IVec2::new(x, y),
             seq,
             powered: true,
             broken: false,
@@ -736,14 +755,21 @@ mod test {
 
     #[test]
     fn la_batteria_copre_il_deficit_senza_blackout_e_il_margine_va_sotto_zero() {
-        // reattore 100 contro 4 life support (-120): deficit 20, la
-        // batteria carica lo copre — nessun blackout, margine negativo
-        let mut batteria = modulo(ModuleKind::Batteria, 1, 1);
+        // reattore 100 contro 4 life support (-120) e un corridoio (-1):
+        // deficit 21, la batteria carica lo copre — nessun blackout,
+        // margine negativo. Layout a norma di conduttori: tre foglie sulle
+        // facce del reattore, il corridoio prolunga verso le altre due.
+        let mut batteria = modulo_xy(ModuleKind::Batteria, 1, 1, 9);
         batteria.carica = CAPIENZA_BATTERIA;
-        let mut moduli = vec![modulo(ModuleKind::Reattore, 0, 0), batteria];
-        for i in 0..4 {
-            moduli.push(modulo(ModuleKind::LifeSupport, 2 + i, 2 + i as u32));
-        }
+        let moduli = vec![
+            modulo_xy(ModuleKind::Reattore, 0, 0, 0),
+            modulo_xy(ModuleKind::LifeSupport, -1, 0, 1),
+            modulo_xy(ModuleKind::LifeSupport, 0, 1, 2),
+            modulo_xy(ModuleKind::LifeSupport, 0, -1, 3),
+            modulo_xy(ModuleKind::Corridoio, 1, 0, 4),
+            modulo_xy(ModuleKind::LifeSupport, 2, 0, 5),
+            batteria,
+        ];
         let (mut world, mut schedule) = mondo_con(moduli);
         un_tick(&mut world, &mut schedule);
         {
@@ -757,7 +783,7 @@ mod test {
             .filter(|m| m.kind == ModuleKind::Batteria)
             .map(|m| m.carica)
             .sum();
-        assert_eq!(carica, CAPIENZA_BATTERIA - 20.0);
+        assert_eq!(carica, CAPIENZA_BATTERIA - 21.0);
         // e ogni life support è rimasto acceso
         assert!(
             q.iter(&world)
@@ -768,6 +794,8 @@ mod test {
 
     #[test]
     fn una_rete_senza_reattore_lascia_la_batteria_inerte() {
+        // batteria e life support adiacenti ma senza conduttori: due isole
+        // scollegate, la carica non si muove
         let mut batteria = modulo(ModuleKind::Batteria, 0, 0);
         batteria.carica = 80.0;
         let moduli = vec![batteria, modulo(ModuleKind::LifeSupport, 1, 1)];
@@ -781,7 +809,7 @@ mod test {
     }
 
     #[test]
-    fn col_surplus_la_batteria_si_carica_di_quindici_per_tick() {
+    fn col_surplus_la_batteria_si_carica_del_tetto_per_tick() {
         let moduli = vec![
             modulo(ModuleKind::Reattore, 0, 0),
             modulo(ModuleKind::Batteria, 1, 1),
@@ -792,5 +820,44 @@ mod test {
         let mut q = world.query::<&Module>();
         let batteria = q.iter(&world).find(|m| m.kind == ModuleKind::Batteria).unwrap();
         assert_eq!(batteria.carica, 2.0 * RICARICA_BATTERIA);
+    }
+
+    // --- la regola dei conduttori ---
+
+    #[test]
+    fn una_foglia_dietro_una_foglia_resta_scollegata() {
+        // reattore, dormitorio, dormitorio in fila: il primo dormitorio si
+        // allaccia (tocca il reattore), il secondo tocca solo una foglia —
+        // le foglie non sono cavi, resta scollegato
+        let moduli = vec![
+            modulo(ModuleKind::Reattore, 0, 0),
+            modulo(ModuleKind::Dormitorio, 1, 1),
+            modulo(ModuleKind::Dormitorio, 2, 2),
+        ];
+        let (mut world, mut schedule) = mondo_con(moduli);
+        un_tick(&mut world, &mut schedule);
+        let mut q = world.query::<&Module>();
+        let vicino = q.iter(&world).find(|m| m.seq == 1).unwrap();
+        assert!(vicino.collegato && vicino.powered);
+        let lontano = q.iter(&world).find(|m| m.seq == 2).unwrap();
+        assert!(
+            !lontano.collegato && !lontano.powered,
+            "una fila di dormitori non deve fare da cavo"
+        );
+    }
+
+    #[test]
+    fn il_corridoio_prolunga_la_rete_dove_le_foglie_non_arrivano() {
+        let moduli = vec![
+            modulo(ModuleKind::Reattore, 0, 0),
+            modulo(ModuleKind::Corridoio, 1, 1),
+            modulo(ModuleKind::Corridoio, 2, 2),
+            modulo(ModuleKind::LifeSupport, 3, 3),
+        ];
+        let (mut world, mut schedule) = mondo_con(moduli);
+        un_tick(&mut world, &mut schedule);
+        let mut q = world.query::<&Module>();
+        let ls = q.iter(&world).find(|m| m.kind == ModuleKind::LifeSupport).unwrap();
+        assert!(ls.collegato && ls.powered, "il corridoio doveva portare la corrente");
     }
 }

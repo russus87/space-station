@@ -1,6 +1,6 @@
 # SPACE STATION — Manuale di gioco
 
-*Manuale operativo di bordo, edizione v0.6 — da leggere prima del primo
+*Manuale operativo di bordo, edizione v0.7 — da leggere prima del primo
 turno in cabina di comando. O durante. Nessuno ti giudica.*
 
 ---
@@ -24,15 +24,19 @@ che ogni numero sullo schermo vuole dirti qualcosa, prima che sia tardi.
 
 | Risorsa | Come funziona |
 |---|---|
-| **Energia** | Non si accumula (salvo Batterie): a ogni tick la produzione dei reattori si distribuisce ai moduli della stessa rete, in ordine di priorità. Se non basta, i moduli meno critici si spengono. |
+| **Energia** | Non si accumula (salvo Batterie) e viaggia solo lungo reattori e corridoi: gli altri moduli si allacciano a un conduttore adiacente. A ogni tick la produzione si distribuisce per priorità; se non basta, i moduli meno critici si spengono. |
 | **Ossigeno** | Riserva unica di stazione, da 0 a 100. Sale con i life support (e le serre) attivi, scende di 10 per membro dell'equipaggio a ogni tick. Sotto 30 scatta l'allarme. |
 | **Calore** | Quasi tutto scalda; radiatori e condotti dissipano. Un bilancio positivo per 6 tick consecutivi manda in avaria un modulo a caso. |
 | **Equipaggio** | Con posti letto liberi e aria buona (riserva sopra 50) arriva una persona ogni 4 tick. Con l'ossigeno a zero, ne muore una ogni 3. |
 
-**La regola d'oro dell'energia**: la corrente non salta il vuoto. Ogni
-gruppo di moduli ortogonalmente adiacenti è una **rete**, e una rete senza
-reattore funzionante è ferraglia fredda. I corridoi esistono per questo:
-un filo di corrente da 1 di energia a cella.
+**La regola d'oro dell'energia**: la corrente non salta il vuoto e
+**viaggia solo lungo i conduttori — reattori e corridoi**. Tutti gli
+altri moduli sono foglie: si appendono a un conduttore adiacente ma non
+prolungano la corrente. Una fila di dormitori non è un cavo (il primo
+funziona, il secondo è ferraglia fredda): ogni stazione vera è una
+**dorsale di corridoi** con le foglie appese ai lati. Un reattore ha
+quattro facce: tre foglie appese e una per la dorsale è il modulo
+d'apertura classico.
 
 ### La cascata di guasti
 
@@ -71,21 +75,21 @@ I valori sono *per tick*. La **priorità** dice l'ordine di alimentazione:
 | <img src="docs/img/laboratorio.png" width="48"> | **Laboratorio** | 4 | −40 | — | +25 | impegna 2 di equipaggio; senza, non lavora e non consuma | 4 |
 | <img src="docs/img/radiatore.png" width="48"> | **Radiatore** | 5 | −5 | — | −50 | il tuo migliore amico | 1 |
 | <img src="docs/img/corridoio.png" width="48"> | **Corridoio** | 6 | −1 | — | — | collega; si orienta da solo | 2 |
-| <img src="docs/img/batteria.png" width="48"> | **Batteria** | 7 | 0 | — | +2 | *sblocco: livello 5* | 1 |
-| <img src="docs/img/serra.png" width="48"> | **Serra** | 8 | −10 | +20 | +8 | *sblocco: livello 15* | 0 |
+| <img src="docs/img/batteria.png" width="48"> | **Batteria** | 7 | 0 | — | +1 | *sblocco: livello 5* | 1 |
+| <img src="docs/img/serra.png" width="48"> | **Serra** | 8 | −8 | +25 | +6 | *sblocco: livello 15* | 0 |
 | <img src="docs/img/gru.png" width="48"> | **Gru** | 9 | −20 | — | +5 | *sblocco: livello 25* | 4 |
 | <img src="docs/img/condotto.png" width="48"> | **Condotto termico** | 0 | −15 | — | −90 | *sblocco: livello 35* | 1 |
 | <img src="docs/img/centro_comando.png" width="48"> | **Centro comando** | C | −25 | — | +5 | *sblocco: livello 45* | 3 |
 
 ### Schede speciali
 
-- **Batteria** — immagazzina fino a **150** di energia: si carica dal
-  surplus della sua rete (al massimo 15 per tick) e la restituisce quando
+- **Batteria** — immagazzina fino a **250** di energia: si carica dal
+  surplus della sua rete (al massimo 25 per tick) e la restituisce quando
   la rete va in deficit, *prima* che qualunque modulo si spenga. Quando
   l'HUD mostra il margine energia in negativo ma niente è in blackout,
   stai andando a batteria: goditi il tempo comprato, ma compra anche un
   reattore.
-- **Serra** — fa più ossigeno per unità di energia del life support (2,0
+- **Serra** — fa più ossigeno per unità di energia del life support (3,1
   contro 1,67) ma meno per cella, e scalda parecchio. Ottima per
   allungare l'aria in fondo a una rete lunga.
 - **Gru** — piazzala **adiacente a un detrito** e tienila accesa: dopo 12
@@ -120,13 +124,13 @@ storto che si riserva ai morti di famiglia — e quelle rocce su cui
 serpeggi coi corridoi non sono soltanto sassi. Il gioco lo racconta per
 gradi: ai livelli **1, 11, 21, 31 e 41** compare un **diario di bordo**
 (la prima volta che ci arrivi), una pagina a testa per chi ha qualcosa da
-dire; le battute dei briefing fanno il resto, una scheggia per volta,
+dire; le battute del prologo fanno il resto, una scheggia per volta,
 fino a un finale che chiude i conti di tutti. Chi vuole la mappa completa
 degli archi la trova in `STORIA.md` — ma è più bello scoprirla giocando.
 
 ### L'equipaggio
 
-Cinque persone ti accompagnano per tutta la campagna: nei briefing di
+Cinque persone ti accompagnano per tutta la campagna: nel prologo di
 **ogni** livello parla uno di loro, e a ogni traguardo uno ti consegna un
 modulo nuovo. E non spariscono quando si gioca: agli **eventi chiave**
 della partita (il primo blackout, la prima avaria, l'ossigeno critico,
@@ -239,25 +243,29 @@ azzera solo quello che contengono, niente di peggio.
 Cinquanta livelli: i primi 6 disegnati a mano (uno per meccanismo), dal 7
 in poi generati con seed fisso — il livello 23 è il livello 23 per tutti.
 Ogni livello ha un obiettivo, spesso dei detriti, e un **budget di
-moduli** (corridoi inclusi) mostrato nel briefing e nell'HUD: a budget
+moduli** (corridoi inclusi) mostrato nel prologo e nell'HUD: a budget
 esaurito si rimuove col tasto destro e si riorganizza. Ogni dieci livelli,
-ai traguardi 5, 15, 25, 35 e 45, si sblocca un modulo nuovo — ed è lì che
-i livelli cominciano a pretenderlo. Nella griglia di selezione le frecce
-su/giù saltano di riga, sinistra/destra di casella.
+ai traguardi 5, 15, 25, 35 e 45, si sblocca un modulo nuovo — e i livelli
+del blocco successivo **pescano più spesso gli obiettivi che lo
+valorizzano** (dopo la Batteria arrivano i "punti senza blackout", dopo la
+Serra gli equipaggi numerosi, dopo la Gru i campi di detriti…). Nella
+griglia di selezione le frecce su/giù saltano di riga, sinistra/destra di
+casella. Nota di servizio: con la ritaratura i livelli generati 7–50 sono
+stati **rigenerati** — se ci avevi già giocato, troverai contenuti nuovi
+(medaglie e progressione restano tue).
 
-All'avvio del livello la griglia si oscura e il personaggio di turno ti
-accoglie con un **fumetto a tutto schermo**: "Avanti" mostra l'obiettivo,
-"Gioca!" ti lascia al cantiere. Compare solo la **prima volta** che
-incontri quel livello (al decimo "Riprova" il sipario non serve più) e si
-naviga anche da tastiera (`Invio` avanti/Gioca!, `Backspace` indietro).
-Il briefing ti dice anche la **medaglia già presa** sul livello e i tempi
-da battere per migliorarla.
+All'avvio del livello la griglia si oscura e si apre il **prologo** (la
+vecchia schermata di briefing non esiste più): la pagina con obiettivo,
+budget, detriti, **medaglia già presa** e tempi da battere compare
+sempre; la **vignetta del personaggio** la precede solo la **prima
+volta** che incontri quel livello. Si naviga anche da tastiera (`Invio`
+avanti/Gioca!, `Backspace` indietro).
 
 **Il tempo è una risorsa.** Il tetto della partita si legge come un
 **timer** nell'HUD (`TEMPO 4:40`, che ingiallisce e poi arrossisce), e la
-velocità paga: completare il livello entro il **40%** del tempo vale la
-**medaglia d'oro**, entro il **70%** l'**argento**, entro il limite il
-**rame**. Col tasto `V` acceleri lo scorrere reale dei tick (×2/×4) senza
+velocità paga: completare il livello entro il **35%** del tempo vale la
+**medaglia d'oro** (1:38 su un limite di 4:40), entro il **60%**
+l'**argento** (2:48), entro il limite il **rame**. Col tasto `V` acceleri lo scorrere reale dei tick (×2/×4) senza
 toccare le regole — il timer di gioco conta i tick, non i tuoi secondi,
 quindi la velocità non cambia la medaglia: cambia solo quanto aspetti.
 La medaglia colora il numero del livello nella griglia di
@@ -271,9 +279,10 @@ Pochi, di proposito.
 
 Dal **titolo** si apre il **Marketplace**: il catalogo delle facilities,
 che si compra coi **crediti delle medaglie** (§4). Quello che compri
-diventa **scorta** persistente; in partita premi **M** (o il bottone
-SCORTE nell'HUD) per aprire l'inventario e **usare** una scorta — che si
-consuma. Una scorta che qui non servirebbe **non si può sprecare**: resta
+diventa **scorta** persistente; in partita le scorte compaiono come
+**icone nella colonna di sinistra**, sopra il pannello ispezione:
+passaci sopra per il tooltip (nome, effetto, stato) e **cliccale per
+usarle** — si consumano. Una scorta che qui non servirebbe **non si può sprecare**: resta
 in magazzino, spenta, col motivo scritto accanto — l'ampliamento stiva
 dove non c'è budget, la sonda senza detriti, i coloni senza posti letto
 liberi, l'ossigeno a riserva già piena, lo spurgo senza surriscaldamento,
@@ -296,7 +305,28 @@ risolve mezzo livello, deve costare mezze campagne.
 
 ---
 
-## 6. Comandi
+## 6. Gli imprevisti
+
+Dal **livello 8** della campagna, e sempre in Infinita, Sfida e Casuale,
+lo spazio smette di essere un vicino tranquillo: 2-4 volte a partita
+capita un imprevisto. Quelli ostili arrivano con un **preavviso di 4
+tick** — la musica si ferma, una **sirena** lampeggia in alto al centro —
+e in quei tick puoi ancora salvarti la stazione: sposta, spegni, prega.
+
+| Imprevisto | Cosa fa | Come si sopravvive |
+|---|---|---|
+| **Meteorite** | Colpisce una cella casuale: modulo → avaria; vuoto → niente | Tieni `R` caldo e un radiatore di scorta |
+| **Tempesta elettromagnetica** | Per 10 tick il surriscaldamento avanza anche a bilancio termico sano | Margine di dissipazione, o uno Spurgo in magazzino |
+| **Sciame di micrometeoriti** | Spezza 1-2 corridoi a caso | La dorsale è il tuo punto debole: ridondanza o riparazione rapida |
+| **Passaggio del pianeta** | Per 15 tick gli arrivi raddoppiano | Niente sirena: goditi il panorama (e prepara i posti letto) |
+
+C'è una grazia iniziale (mai prima del tick 40), un intervallo minimo tra
+un evento e l'altro, e mai due uguali di fila: il gioco sfida, non tende
+agguati.
+
+---
+
+## 7. Comandi
 
 | Input | Effetto |
 |---|---|
@@ -308,7 +338,6 @@ risolve mezzo livello, deve costare mezze campagne.
 | `R` | ripara il modulo in avaria sotto il cursore |
 | `Spazio` | avvia/ferma la simulazione (da fermi si costruisce senza conseguenze, l'HUD mostra l'anteprima) |
 | `V` | velocità di gioco: ×1 → ×2 → ×4 (stessi tick, più rapidi; l'HUD lo mostra accanto al timer; torna a ×1 a ogni partita) |
-| `M` | apre le scorte comprate nel Marketplace |
 | `Esc` | menu di pausa (congela anche il tempo) — anche col bottone MENU nell'HUD |
 | `F12` | salva uno screenshot nella cartella corrente |
 | frecce + `Invio` | navigano i menu (`Invio`/`Backspace` avanzano e arretrano anche il prologo) |
@@ -316,7 +345,7 @@ risolve mezzo livello, deve costare mezze campagne.
 
 ---
 
-## 7. L'audio
+## 8. L'audio
 
 Ogni suono della stazione è generato da uno script (`tools/gen_audio.py`),
 come gli sprite: onde quadre e triangolari, niente registrazioni. La
@@ -341,7 +370,7 @@ ricordata tra una sessione e l'altra.
 
 ---
 
-## 8. Consigli di sopravvivenza
+## 9. Consigli di sopravvivenza
 
 1. **Un radiatore prima del secondo reattore.** Due reattori sono +80 di
    calore: il surriscaldamento perdona 6 tick, poi rompe qualcosa a caso

@@ -27,6 +27,12 @@ pub const TRACCE: [&str; 7] = [
 #[derive(Component)]
 pub struct TagMusica;
 
+/// La musica è momentaneamente sospesa (sirena degli imprevisti): la
+/// traccia resta in pausa, non riparte da capo. La alza e la abbassa
+/// `imprevisti.rs`.
+#[derive(Resource, Default)]
+pub struct MusicaSospesa(pub bool);
+
 #[derive(Resource, Default)]
 pub struct StatoMusica {
     /// Indice in `TRACCE` della traccia in riproduzione.
@@ -102,6 +108,29 @@ pub fn applica_volume(
     }
     for mut s in &mut sink {
         s.set_volume(Volume::Linear(imp.musica_lineare()));
+    }
+}
+
+/// Mette in pausa/riprende la traccia quando la sirena degli imprevisti
+/// alza o abbassa `MusicaSospesa`; i sink nati mentre la sospensione è
+/// attiva (cambio traccia sotto sirena) nascono già in pausa.
+pub fn applica_sospensione(
+    sospesa: Res<MusicaSospesa>,
+    sink: Query<&AudioSink, With<TagMusica>>,
+    nuovi: Query<&AudioSink, (With<TagMusica>, Added<AudioSink>)>,
+) {
+    if sospesa.is_changed() {
+        for s in &sink {
+            if sospesa.0 {
+                s.pause();
+            } else {
+                s.play();
+            }
+        }
+    } else if sospesa.0 {
+        for s in &nuovi {
+            s.pause();
+        }
     }
 }
 

@@ -14,8 +14,8 @@ use crate::mercato::FACILITIES;
 use crate::progressi::Portafoglio;
 use rand::RngExt;
 use crate::modules::{KINDS, TABELLA};
-use crate::personaggi::{PERSONAGGI, annuncio_sblocco, battuta_briefing};
-use crate::sim::{MotivoFine, OSSIGENO_PER_CREW, Sim, TICK_MASSIMO, TICK_SURRISCALDAMENTO, TICK_SECS};
+use crate::personaggi::{PERSONAGGI, annuncio_sblocco};
+use crate::sim::{MotivoFine, OSSIGENO_PER_CREW, Sim, TICK_SURRISCALDAMENTO, TICK_SECS};
 use crate::ui::{
     BIANCO, CIANO, GIALLO, GRIGIO_MEDIO, GRIGIO_SCAFO, METALLO, NERO, ROSSO, SCAFO_SCURO, VERDE,
 };
@@ -30,15 +30,17 @@ pub enum AppState {
     ComeSiGioca,
     /// Campagna: griglia dei 50 livelli con stato completato/disponibile/bloccato.
     SelezioneLivello,
-    /// Nome, briefing e obiettivo del livello scelto, prima di cominciare.
-    Briefing,
-    /// Schermata di storia (diario di bordo) prima del briefing dei livelli
-    /// chiave della campagna: solo la prima volta che ci si arriva.
+    /// Schermata di storia (diario di bordo) prima dei livelli chiave della
+    /// campagna: solo la prima volta che ci si arriva. Da qui (o
+    /// direttamente dalla selezione) si entra in partita: nome, obiettivo e
+    /// numeri del livello li dà il prologo sopra la griglia (prologo.rs) —
+    /// la vecchia schermata di briefing non esiste più.
     Intermezzo,
     /// Top 10 delle partite in modalità infinita.
     SchermataClassifica,
     /// Catalogo delle facilities: si compra coi crediti delle medaglie,
-    /// mai con valuta reale. Le scorte comprate si usano in partita (M).
+    /// mai con valuta reale. Le scorte comprate si usano in partita
+    /// cliccando le loro icone nella colonna sinistra.
     Marketplace,
     InGioco,
     /// Obiettivo del livello raggiunto: punteggio, tick e avanzamento.
@@ -93,14 +95,15 @@ pub enum Azione {
     ApriMarketplace,
     /// Compra la facility `i` del catalogo, se i crediti bastano.
     CompraFacility(usize),
-    /// Dalla selezione livello al briefing del livello i (0-based).
+    /// Dalla selezione livello dritti in partita (via intermezzo se il
+    /// livello ne ha uno mai visto), col prologo aperto sopra la griglia.
     ScegliLivello(usize),
-    /// Dall'intermezzo al briefing del livello già scelto.
-    ApriBriefing,
-    /// Dal briefing alla partita, in modalità campagna.
+    /// Avvia il livello già in `LivelloScelto` (usata dall'intermezzo).
     IniziaLivello,
-    /// Da "livello completato" al briefing del livello successivo.
+    /// Da "livello completato" al livello successivo, dritti in partita.
     LivelloSuccessivo,
+    /// Apre assets/manuale.pdf col visualizzatore di sistema.
+    ApriManuale,
     ComeSiGioca,
     Riprendi,
     /// Passo successivo del volume musica (100→75→50→25→0→100).
@@ -329,6 +332,28 @@ pub fn esci_titolo(mut commands: Commands, q: Query<Entity, With<SchermataTitolo
 
 // ---------------- Come si gioca ----------------
 
+/// Apre `assets/manuale.pdf` col visualizzatore di sistema. Il percorso è
+/// risolto come `percorso_assets` in main.rs: accanto all'eseguibile
+/// (build distribuita), ripiego sulla radice del sorgente. Fallisce in
+/// silenzio: un PDF che non si apre non merita un allarme di stazione.
+fn apri_manuale() {
+    let percorso = std::env::current_exe()
+        .ok()
+        .and_then(|exe| exe.parent().map(|d| d.join("assets/manuale.pdf")))
+        .filter(|p| p.is_file())
+        .unwrap_or_else(|| {
+            std::path::PathBuf::from(concat!(env!("CARGO_MANIFEST_DIR"), "/assets/manuale.pdf"))
+        });
+    if cfg!(target_os = "windows") {
+        let _ = std::process::Command::new("cmd")
+            .args(["/C", "start", ""])
+            .arg(&percorso)
+            .spawn();
+    } else {
+        let _ = std::process::Command::new("xdg-open").arg(&percorso).spawn();
+    }
+}
+
 pub fn entra_guida(
     mut commands: Commands,
     art: Res<Art>,
@@ -337,7 +362,7 @@ pub fn entra_guida(
 ) {
     *sel = Selezione {
         idx: 0,
-        n: 1,
+        n: 2,
         conferma: None,
     };
     commands
@@ -477,7 +502,7 @@ pub fn entra_guida(
             for riga in [
                 "1-6 e 7 8 9 0 C  scegli il modulo          click sinistro  piazza",
                 "click destro  rimuove          R  ripara un modulo in avaria",
-                "Spazio  avvia/ferma          M  scorte          F12  screenshot",
+                "Spazio  avvia/ferma          V  velocita'          F12  screenshot",
                 "Esc  apre il menu (volumi compresi) e congela tutto",
                 "Finisci i livelli in fretta: le medaglie fruttano crediti per il Marketplace",
             ] {
@@ -496,7 +521,8 @@ pub fn entra_guida(
                 height: Val::Px(16.0),
                 ..default()
             });
-            voce(r, 0, Azione::Indietro, "Indietro");
+            voce(r, 0, Azione::ApriManuale, "Manuale illustrato (PDF)");
+            voce(r, 1, Azione::Indietro, "Indietro");
         });
 }
 
@@ -604,103 +630,6 @@ pub fn esci_selezione(mut commands: Commands, q: Query<Entity, With<SchermataSel
     }
 }
 
-// ---------------- Briefing ----------------
-
-#[derive(Component)]
-pub struct SchermataBriefing;
-
-/// Nome, briefing e obiettivo per esteso, prima di cominciare il livello.
-/// Nei livelli chiave un personaggio commenta il briefing a fumetto.
-/// Minuti:secondi per un numero di tick, per parlare la lingua del timer.
-fn tick_in_tempo(tick: u64) -> String {
-    let secondi = (tick as f32 * TICK_SECS) as u64;
-    format!("{}:{:02}", secondi / 60, secondi % 60)
-}
-
-pub fn entra_briefing(
-    mut commands: Commands,
-    scelto: Res<LivelloScelto>,
-    art: Res<Art>,
-    portafoglio: Res<Portafoglio>,
-    mut sel: ResMut<Selezione>,
-) {
-    let l = &LIVELLI[scelto.0];
-    *sel = Selezione {
-        idx: 0,
-        n: 2,
-        conferma: None,
-    };
-    commands
-        .spawn((
-            radice_centrata(),
-            BackgroundColor(NERO),
-            GlobalZIndex(10),
-            SchermataBriefing,
-        ))
-        .with_children(|r| {
-            r.spawn(testo(format!("LIVELLO {}", scelto.0 + 1), 15.0, GRIGIO_MEDIO));
-            r.spawn(testo(l.nome.clone(), 34.0, BIANCO));
-            r.spawn((Node {
-                margin: UiRect::top(Val::Px(12.0)),
-                ..default()
-            },))
-            .with_children(|c| {
-                c.spawn(testo(l.briefing.clone(), 15.0, METALLO));
-            });
-            r.spawn(testo(
-                format!("Obiettivo: {}", l.obiettivo.descrizione()),
-                15.0,
-                GIALLO,
-            ));
-            r.spawn((Node {
-                margin: UiRect::bottom(Val::Px(20.0)),
-                ..default()
-            },))
-            .with_children(|c| {
-                c.spawn(testo(
-                    format!("Moduli disponibili: {} (corridoi inclusi)", l.max_moduli),
-                    14.0,
-                    CIANO,
-                ));
-            });
-            // la medaglia già in bacheca e cosa serve per migliorarla: è
-            // l'informazione di chi sta decidendo se rigiocare
-            let medaglia = portafoglio.medaglia(scelto.0);
-            if medaglia > 0 {
-                let (nome, colore) = match medaglia {
-                    crate::progressi::ORO => ("ORO", GIALLO),
-                    crate::progressi::ARGENTO => ("ARGENTO", BIANCO),
-                    _ => ("RAME", crate::ui::RUGGINE),
-                };
-                let mut riga = format!("Medaglia attuale: {nome}");
-                if medaglia < crate::progressi::ORO {
-                    riga.push_str(&format!(
-                        "  ·  oro entro {}",
-                        tick_in_tempo(TICK_MASSIMO * 4 / 10)
-                    ));
-                    if medaglia < crate::progressi::ARGENTO {
-                        riga.push_str(&format!(
-                            ", argento entro {}",
-                            tick_in_tempo(TICK_MASSIMO * 7 / 10)
-                        ));
-                    }
-                }
-                r.spawn((Node {
-                    margin: UiRect::bottom(Val::Px(10.0)),
-                    ..default()
-                },))
-                .with_children(|c| {
-                    c.spawn(testo(riga, 13.0, colore));
-                });
-            }
-            if let Some((personaggio, battuta)) = battuta_briefing(scelto.0 + 1) {
-                fumetto(r, &art, personaggio, battuta);
-            }
-            voce(r, 0, Azione::IniziaLivello, "Inizia");
-            voce(r, 1, Azione::ApriCampagna, "Indietro");
-        });
-}
-
 // ---------------- Intermezzo (storia) ----------------
 
 #[derive(Component)]
@@ -708,7 +637,7 @@ pub struct SchermataIntermezzo;
 
 /// Diario di bordo dei livelli chiave (1, 11, 21, 31, 41): il personaggio
 /// del blocco racconta la svolta. Si vede solo la prima volta che si
-/// raggiunge il livello; "Continua" porta al briefing normale.
+/// raggiunge il livello; "Continua" entra in partita (col prologo sopra).
 pub fn entra_intermezzo(
     mut commands: Commands,
     scelto: Res<LivelloScelto>,
@@ -749,17 +678,11 @@ pub fn entra_intermezzo(
                 height: Val::Px(8.0),
                 ..default()
             });
-            voce(r, 0, Azione::ApriBriefing, "Continua");
+            voce(r, 0, Azione::IniziaLivello, "Continua");
         });
 }
 
 pub fn esci_intermezzo(mut commands: Commands, q: Query<Entity, With<SchermataIntermezzo>>) {
-    for e in &q {
-        commands.entity(e).despawn();
-    }
-}
-
-pub fn esci_briefing(mut commands: Commands, q: Query<Entity, With<SchermataBriefing>>) {
     for e in &q {
         commands.entity(e).despawn();
     }
@@ -977,7 +900,8 @@ fn card_facility(
 
 /// Catalogo delle facilities: si compra coi crediti delle medaglie
 /// (oro 3, argento 2, rame 1 — e solo la differenza quando si migliora),
-/// mai con soldi veri. Le scorte comprate si usano in partita col tasto M.
+/// mai con soldi veri. Le scorte comprate si usano in partita cliccando
+/// le loro icone nella colonna sinistra (tooltip col motivo se inutili).
 pub fn entra_marketplace(
     mut commands: Commands,
     portafoglio: Res<Portafoglio>,
@@ -1443,7 +1367,7 @@ pub fn naviga(
             | AppState::Marketplace => {
                 prossimo.set(AppState::Titolo);
             }
-            AppState::Briefing | AppState::Intermezzo => {
+            AppState::Intermezzo => {
                 prossimo.set(AppState::SelezioneLivello);
             }
             // A stazione persa (o a livello finito) Esc non ha scorciatoie:
@@ -1612,15 +1536,18 @@ fn esegui(
         Azione::ScegliLivello(i) => {
             scelto.0 = i;
             // la storia si mostra solo la prima volta che si arriva al
-            // livello; rigiocando, dritti al briefing
+            // livello; altrimenti dritti in partita: obiettivo e numeri li
+            // dà il prologo sopra la griglia
             if progressione.completati == i && crate::personaggi::intermezzo_per(i + 1).is_some()
             {
                 prossimo.set(AppState::Intermezzo);
             } else {
-                prossimo.set(AppState::Briefing);
+                *modalita = Modalita::Campagna(i);
+                reset.0 = true;
+                pausa.aperta = false;
+                prossimo.set(AppState::InGioco);
             }
         }
-        Azione::ApriBriefing => prossimo.set(AppState::Briefing),
         Azione::IniziaLivello => {
             *modalita = Modalita::Campagna(scelto.0);
             reset.0 = true;
@@ -1628,12 +1555,24 @@ fn esegui(
             prossimo.set(AppState::InGioco);
         }
         Azione::LivelloSuccessivo => {
-            // il livello corrente sta nella modalità: si passa al successivo
+            // il livello corrente sta nella modalità: si passa al successivo,
+            // con la stessa deviazione-intermezzo della selezione (i diari
+            // di bordo vivono proprio sui livelli raggiunti così)
             if let Modalita::Campagna(i) = *modalita {
                 scelto.0 = (i + 1).min(LIVELLI.len() - 1);
             }
-            prossimo.set(AppState::Briefing);
+            let i = scelto.0;
+            if progressione.completati == i && crate::personaggi::intermezzo_per(i + 1).is_some()
+            {
+                prossimo.set(AppState::Intermezzo);
+            } else {
+                *modalita = Modalita::Campagna(i);
+                reset.0 = true;
+                pausa.aperta = false;
+                prossimo.set(AppState::InGioco);
+            }
         }
+        Azione::ApriManuale => apri_manuale(),
         Azione::ComeSiGioca => {
             origine.stato = if attuale == AppState::InGioco {
                 AppState::InGioco

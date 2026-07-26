@@ -10,9 +10,13 @@
 > velocità di gioco ✓** (tasto V), **9.5 audio ✓** (effetti + colonna
 > sonora), e **9.4 stelle: superata** — le medaglie oro/argento/rame a
 > tempo ne hanno preso il posto con in più l'economia dei crediti.
-> **Restano proposte**: 9.1 eventi con scelta, 9.2 riparazione con costo,
-> 9.6 sfida del giorno, i tratti passivi dei personaggi (§4) e i livelli
-> curati di fine blocco.
+> Dalla v0.7: **imprevisti casuali implementati** (meteorite, tempesta,
+> sciame, pianeta — parenti stretti della 9.1 ma senza scelta), regola dei
+> conduttori (i corridoi sono la dorsale), obiettivi **pesati per blocco**
+> (§2.2, era l'intento originario) e livelli 7–50 **rigenerati** con la
+> ritaratura. **Restano proposte**: 9.1 eventi CON SCELTA (il bivio a due
+> opzioni), 9.2 riparazione con costo, 9.6 sfida del giorno, i tratti
+> passivi dei personaggi (§4) e i livelli curati di fine blocco.
 
 Obiettivo dell'iterazione, nelle parole del giocatore: campagna lunga
 (~50 livelli) percorsa in modo lineare, sblocchi che danno cose utili ogni
@@ -111,8 +115,8 @@ valgono ovunque, la campagna è il modo di ottenerli).
 
 | Modulo | Energia | O2 | Calore | Regola speciale | Sblocco |
 |---|---|---|---|---|---|
-| **Batteria** | 0 | 0 | +2 | Immagazzina fino a 150: si carica col surplus della sua rete (max 15/tick), e quando la rete va in deficit restituisce quanto ha **prima** che i moduli si spengano. | liv. 5 |
-| **Serra** | −10 | +20 | +8 | Nessuna. Ossigeno più efficiente per energia del Life Support (2,0 vs 1,67 O2/energia) ma meno per cella e più caldo: conviene dove l'energia è scarsa. | liv. 15 |
+| **Batteria** | 0 | 0 | +1 | Immagazzina fino a 250: si carica col surplus della sua rete (max 25/tick), e quando la rete va in deficit restituisce quanto ha **prima** che i moduli si spengano. | liv. 5 |
+| **Serra** | −8 | +25 | +6 | Nessuna. L'ossigeno più efficiente per energia del gioco (3,1 vs 1,67 O2/energia del Life Support): dove i watt sono contati, vince. | liv. 15 |
 | **Gru** | −20 | 0 | +5 | Dopo 12 tick attivi consecutivi **rimuove un detrito ortogonalmente adiacente** e si smonta: spariscono entrambi, due celle libere. Se non ha detriti adiacenti è solo un costo. | liv. 25 |
 | **Condotto termico** | −15 | 0 | **−90** | Nessuna. Radiatore pesante: metà celle a parità di dissipazione, ma il triplo dell'energia. | liv. 35 |
 | **Centro comando** | −25 | 0 | +5 | **Max 1 per stazione.** Se attivo, gli arrivi passano da 1 ogni 4 tick a 1 ogni 2. | liv. 45 |

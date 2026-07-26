@@ -24,8 +24,8 @@ PERSA". In Infinita non c'è: lì l'idea è proprio vedere fin dove riesci
 ad arrivare, senza un orologio sopra.
 
 In campagna il tempo fa anche le **medaglie**: finisci il livello entro
-il 40% del limite ed è **oro**, entro il 70% **argento**, entro il limite
-**rame**. La medaglia colora il numero del livello nella griglia di
+il 35% del limite ed è **oro** (su un limite di 4:40 vuol dire entro
+1:38), entro il 60% **argento** (entro 2:48), entro il limite **rame**. La medaglia colora il numero del livello nella griglia di
 selezione e frutta **crediti** (1/2/3, solo quando migliori) da spendere
 nel **Marketplace** del titolo per comprare scorte.
 
@@ -73,7 +73,7 @@ difficoltà crescente):
 | 6 | Colonia | avere 12 di equipaggio e sopravvivere 100 tick | 18 |
 
 Ogni livello ha un **limite di moduli** (colonna "Moduli", corridoi
-inclusi): lo vedi nel briefing e nell'HUD accanto all'obiettivo
+inclusi): lo vedi nel prologo del livello e nell'HUD accanto all'obiettivo
 ("moduli 7/12"). A limite raggiunto non puoi più costruire — ma rimuovere
 un modulo col tasto destro libera il posto, quindi puoi sempre
 riorganizzare. Il limite è tarato sull'obiettivo: c'è margine per i
@@ -111,11 +111,13 @@ peggio.
   avvertimento, rosso è un'emergenza. In fondo alla barra, il punteggio.
 - **A sinistra**: la palette degli undici moduli (tasti 1–6 e 7 8 9 0 C;
   gli sbloccabili mostrano "si sblocca al livello N" finché non li
-  conquisti) con i loro costi, e sotto il pannello ispezione: punta un
-  modulo col mouse e leggi cosa fa, in che stato è e perché.
+  conquisti) con i loro costi; sotto, le **icone delle scorte** comprate
+  nel Marketplace (passaci sopra per il tooltip, cliccale per usarle) e il
+  pannello ispezione: punta un modulo col mouse e leggi cosa fa.
 - **Al centro**: la griglia 14×8 dove costruisci.
-- **In basso**: il registro eventi. Ogni cosa che succede — un blackout,
-  un'avaria, un morto — scrive una riga qui. È lo strumento principale per
+- **In basso**: il **Registro** eventi, chiuso di default — clicca
+  l'icona "Registro" per aprirlo. Ogni cosa che succede — un blackout,
+  un'avaria, un morto — scrive una riga lì. È lo strumento principale per
   capire le catene di causa ed effetto.
 
 Ogni modulo sulla griglia è riconoscibile dalla forma; il numero
@@ -138,7 +140,6 @@ con il 2). Un modulo fermo mostra un simbolo che dice il perché:
 | Click sinistro | Piazza il modulo selezionato nella cella libera |
 | Click destro | Rimuove il modulo sotto il cursore (perso, non recuperabile) |
 | `R` | Ripara il modulo in avaria sotto il cursore (gratis) |
-| `M` | Apre le scorte: le facilities comprate nel Marketplace (dal titolo) coi crediti delle medaglie |
 | `Spazio` | Avvia/ferma la simulazione |
 | `V` | Cambia la velocità di gioco: ×1 → ×2 → ×4 (stesse regole, tick più rapidi; l'HUD mostra ×2/×4) |
 | `Esc` | Apre il menu di pausa (riprendi, volumi di musica ed effetti, ricomincia, torna al titolo) |
@@ -161,32 +162,51 @@ lo chiudi.
 
 ## La rete elettrica
 
-L'energia **non si teletrasporta**: arriva a un modulo solo se una catena di
-moduli su celle adiacenti (sopra/sotto/sinistra/destra, niente diagonali) lo
-collega a un reattore. Ogni gruppo di moduli che si toccano è una **rete**, e
-ogni rete fa il suo bilancio da sola: l'energia non passa da una rete
-all'altra.
+L'energia **non si teletrasporta**, e — regola importante — **viaggia
+solo lungo i conduttori: reattori e corridoi**. Tutti gli altri moduli
+sono "foglie": si allacciano a un conduttore su una cella adiacente
+(sopra/sotto/sinistra/destra, niente diagonali) ma **non prolungano la
+corrente**. Una fila di dormitori NON è un cavo: il primo che tocca il
+reattore funziona, il secondo è scollegato. Per allontanarti dal reattore
+serve una **dorsale di corridoi**, con le foglie appese ai lati.
 
-- Un modulo la cui rete **non contiene un reattore funzionante** è
-  **scollegato** (fulmine grigio): non consuma e non fa niente, finché non
-  lo colleghi. È un problema diverso dal blackout (fulmine giallo), in cui
-  la rete un reattore ce l'ha ma la corrente non basta per tutti.
-- **Qualunque modulo conduce**, anche in avaria: un modulo rotto resta un
-  "tubo" che fa passare la corrente. Ma un reattore in avaria non produce.
-- Il **Corridoio** è il connettore economico: costa solo 1 di energia e
-  serve esattamente a portare la corrente dove ti serve. Sulla griglia si
-  orienta **da solo** guardando i moduli adiacenti — dritto, curva, T o
-  incrocio — così vedi a colpo d'occhio dove passa (e dove non passa) la
-  corrente.
+- Ogni reattore ha 4 facce: al massimo 4 foglie appese direttamente (una
+  di solito la spendi per far partire la dorsale).
+- Un modulo che non tocca nessun conduttore alimentato è **scollegato**
+  (fulmine grigio): non consuma e non fa niente. È un problema diverso dal
+  blackout (fulmine giallo), in cui la rete un reattore ce l'ha ma la
+  corrente non basta per tutti.
+- **I conduttori conducono anche in avaria** (un corridoio rotto resta un
+  tubo), ma un reattore in avaria non produce.
+- Il Corridoio costa solo 1 di energia e sulla griglia si orienta **da
+  solo** — dritto, curva, T o incrocio — così vedi a colpo d'occhio dove
+  passa la corrente.
 
 Solo l'energia ragiona per reti: ossigeno, calore ed equipaggio sono in
 comune su tutta la stazione.
+
+## Gli imprevisti
+
+Dal **livello 8** della campagna (e sempre nelle sandbox) lo spazio
+comincia a dire la sua: 2-4 volte a partita può capitare un imprevisto.
+Quelli cattivi arrivano con un **preavviso di 4 tick**: la musica si
+ferma, una sirena lampeggia in alto — hai quel tempo per prepararti.
+
+| Imprevisto | Effetto |
+|---|---|
+| **Meteorite** | Colpisce una cella: se c'è un modulo, avaria. Se cade nel vuoto, tiri il fiato |
+| **Tempesta elettromagnetica** | Per 10 tick il surriscaldamento accelera anche a bilancio termico sano |
+| **Sciame di micrometeoriti** | Spezza 1-2 corridoi: con la regola dei conduttori, mira alla dorsale |
+| **Passaggio del pianeta** | L'unico bello: per 15 tick gli arrivi raddoppiano. Niente sirena, solo panorama |
+
+C'è un periodo di grazia a inizio partita e un intervallo minimo tra un
+imprevisto e l'altro: il gioco ti mette alla prova, non ti tende agguati.
 
 ## Le quattro risorse
 
 | Risorsa | Cosa succede se va male |
 |---|---|
-| Energia | Viaggia solo dentro la rete di moduli adiacenti. Se in una rete il consumo supera la produzione, i suoi moduli si spengono da soli, i meno vitali per primi (blackout) |
+| Energia | Viaggia solo lungo reattori e corridoi; gli altri moduli si allacciano a un conduttore adiacente. Se in una rete il consumo supera la produzione, i moduli si spengono da soli, i meno vitali per primi (blackout) |
 | Ossigeno | Riserva da 0 a 100, comune a tutta la stazione. Se scende a zero, l'equipaggio muore uno alla volta |
 | Calore | Se ne produci più di quanto ne dissipi, dopo 6 tick un modulo a caso va in avaria |
 | Equipaggio | Arriva da solo se ci sono posti letto e aria buona; serve ai laboratori per lavorare. **Se torna a zero la partita è persa** |
@@ -205,8 +225,8 @@ indicati (e una volta conquistati valgono in tutte le modalità).
 | 4 | Laboratorio | −40 | 0 | +25 | richiede 2 di equipaggio; si spegne per primo | — |
 | 5 | Radiatore | −5 | 0 | −50 | — | — |
 | 6 | Corridoio | −1 | 0 | 0 | collega, si orienta da solo | — |
-| 7 | Batteria | 0 | 0 | +2 | accumula 150, copre i deficit di rete | livello 5 |
-| 8 | Serra | −10 | +20 | +8 | ossigeno efficiente per energia | livello 15 |
+| 7 | Batteria | 0 | 0 | +1 | accumula 250 (ricarica 25/tick), copre i deficit di rete | livello 5 |
+| 8 | Serra | −8 | +25 | +6 | l'ossigeno più efficiente per energia (3,1 per watt) | livello 15 |
 | 9 | Gru | −20 | 0 | +5 | 12 tick e rimuove un detrito adiacente, poi si smonta | livello 25 |
 | 0 | Condotto termico | −15 | 0 | −90 | radiatore pesante | livello 35 |
 | C | Centro comando | −25 | 0 | +5 | max 1: arrivi ogni 2 tick invece di 4 | livello 45 |
@@ -217,9 +237,9 @@ Note:
   arriva, il consumo di 40 scatta di colpo.
 - Ogni membro dell'equipaggio consuma **10 ossigeno per tick**: un life
   support (+50) mantiene al massimo 5 persone.
-- Il corridoio non produce e non fa niente: serve a **collegare**. Una fila
-  di corridoi da 1 di energia l'una è il modo più economico di portare la
-  corrente del reattore a un modulo lontano.
+- Il corridoio è l'**unico modo di portare la corrente lontano** dal
+  reattore (regola dei conduttori): la dorsale di corridoi è lo scheletro
+  di ogni stazione, le foglie ci si appendono ai lati.
 
 ## Il bilancio a ogni tick
 

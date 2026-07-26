@@ -139,10 +139,11 @@ pub const TABELLA: [ModuleDef; 11] = [
         sigla: "BAT",
         sprite: "sprites/moduli/batteria.png",
         // l'energia nominale è 0: carica e scarica stanno in sim.rs
-        // (CAPIENZA_BATTERIA, RICARICA_BATTERIA), sul residuo della rete
+        // (CAPIENZA_BATTERIA 250, RICARICA_BATTERIA 25), sul residuo della
+        // rete. Quasi non scalda: è l'assicurazione che si dimentica lì.
         energia: 0.0,
         ossigeno: 0.0,
-        calore: 2.0,
+        calore: 1.0,
         posti_letto: 0,
         equipaggio_richiesto: 0,
         priorita: 1,
@@ -153,9 +154,11 @@ pub const TABELLA: [ModuleDef; 11] = [
         nome: "Serra",
         sigla: "SER",
         sprite: "sprites/moduli/serra.png",
-        energia: -10.0,
-        ossigeno: 20.0,
-        calore: 8.0,
+        // l'ossigeno più efficiente per energia del gioco (3,1 O2/energia
+        // contro l'1,67 del life support): dove i watt sono contati, vince
+        energia: -8.0,
+        ossigeno: 25.0,
+        calore: 6.0,
         posti_letto: 0,
         equipaggio_richiesto: 0,
         priorita: 0, // fa ossigeno: critica come il life support
